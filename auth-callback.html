@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050806">
+<title>Signing in to SoundWave</title>
+<style>
+html,body{margin:0;min-height:100%;background:#050806;color:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body{min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}.card{width:min(430px,100%);padding:30px;border:1px solid #26332b;border-radius:24px;background:linear-gradient(180deg,#121814,#0b0f0c);box-shadow:0 28px 80px #0008;text-align:center}.logo{width:58px;height:58px;margin:0 auto 18px;border-radius:18px;display:grid;place-items:center;background:#1ed760;color:#041008;font-size:28px;font-weight:900;box-shadow:0 0 40px #1ed76035}.eyebrow{color:#65ea95;font-size:11px;font-weight:800;letter-spacing:.14em}.card h1{font-size:25px;margin:8px 0}.card p{margin:0;color:#aeb8b1;line-height:1.55}.loader{display:flex;justify-content:center;gap:7px;margin:24px 0 0}.loader i{width:8px;height:8px;border-radius:50%;background:#1ed760;animation:b 1s infinite ease-in-out}.loader i:nth-child(2){animation-delay:.15s}.loader i:nth-child(3){animation-delay:.3s}@keyframes b{0%,80%,100%{transform:scale(.65);opacity:.45}40%{transform:scale(1);opacity:1}}.error{margin-top:18px;padding:12px;border:1px solid #ff778055;border-radius:14px;background:#7b283044;color:#ffd7da;text-align:left;font-size:13px}.retry{display:none;margin:16px auto 0;padding:11px 18px;border:0;border-radius:999px;background:#1ed760;color:#041008;font-weight:800;cursor:pointer}
+</style>
+</head>
+<body>
+<main class="card"><div class="logo">♫</div><span class="eyebrow">SOUNDWAVE</span><h1>Finishing Google sign-in</h1><p id="status">Securely connecting your Google account to SoundWave…</p><div class="loader" id="loader"><i></i><i></i><i></i></div><div class="error" id="error" hidden></div><button class="retry" id="retry" type="button">Back to sign in</button></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://azqbzyxknfdwfuqevbrd.supabase.co';
+const SUPABASE_KEY='sb_publishable_OcR9EJnNuPqBWtZrmNVUdA_tt_CMCmR';
+const statusEl=document.getElementById('status'),errorEl=document.getElementById('error'),loader=document.getElementById('loader'),retry=document.getElementById('retry');
+const fail=(message)=>{loader.hidden=true;statusEl.textContent='Google sign-in could not be completed.';errorEl.hidden=false;errorEl.textContent=message||'No authenticated session was returned.';retry.style.display='inline-block';sessionStorage.setItem('soundwave-oauth-error',message||'Google sign-in failed.');};
+retry.onclick=()=>location.replace('/');
+(async()=>{
+ try{
+   const params=new URLSearchParams(location.search);const queryError=params.get('error_description')||params.get('error');
+   if(queryError)throw new Error(queryError);
+   const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
+   let session=null;
+   for(let i=0;i<40;i++){
+     const {data,error}=await db.auth.getSession();if(error)throw error;
+     if(data?.session?.user){session=data.session;break;}
+     await new Promise(r=>setTimeout(r,150));
+   }
+   if(!session)throw new Error('Supabase did not create a session from the Google callback. Verify that this callback page is included in Supabase Redirect URLs.');
+   sessionStorage.removeItem('soundwave-oauth-return');sessionStorage.removeItem('soundwave-oauth-error');
+   statusEl.textContent='Signed in. Opening SoundWave…';
+   location.replace('/#/discover');
+ }catch(err){console.error(err);fail(err?.message||String(err));}
+})();
+</script>
+</body>
+</html>
