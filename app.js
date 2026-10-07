@@ -3,7 +3,7 @@ const SUPABASE_URL = 'https://azqbzyxknfdwfuqevbrd.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_OcR9EJnNuPqBWtZrmNVUdA_tt_CMCmR';
 const configured = Boolean(SUPABASE_URL && SUPABASE_KEY && !SUPABASE_URL.includes('YOUR_PROJECT') && !SUPABASE_KEY.includes('YOUR_PUBLISHABLE_KEY'));
 const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true, flowType: 'implicit' }
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true, flowType: 'pkce' }
 }) : null;
 /* ====== APP ====== */
 
@@ -18,6 +18,9 @@ function check(result){
 const escapeHtml = (v = '') => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = { user:null, profile:null, artist:null, admin:false, page:'discover', songs:[], artists:[], favorites:[], playlists:[], playlistSongs:[], playlistCollaborators:[], albums:[], genres:[], plans:[], subscriptions:[], podcasts:[], episodes:[], myShows:[], history:[], members:[], selectedShow:null, selectedPlaylist:null, selectedArtist:null, podcastHistory:[], followers:[], following:[], player:null, playerToken:0, loading:false, error:'',coverUrls:{},subscriptionMembers:[],sharedMemberships:[],paymentRows:[],uiFilter:'all',libraryExpanded:true,navStack:[],navForward:[],songMenu:null, offlineDownloads:[], entitlement:null, socialSource:'user_follow', liked:[], likedIds:new Set(), likesAvailable:true, selectedAlbum:null, searchQuery:'', searchGenre:null, searchTab:'all', libFilter:'all', discoverFilter:'all', railTab:'now', hist:{i:0,max:0}, routeReady:false, installEvent:null, tint:null, focusSearch:null, libQuery:'', libSearchOpen:false };
 Object.assign(state, { historyError: '', historyWriteError: '', episodeTitles: {}, likesMode: 'remote', artistFollowers: [], followerCounts: {}, socialProfiles: {}, socialRpc: { counts: false, mine: false, profiles: false }, profileStats:null, studioStats:null, royaltySummary:null, adminData:null, subscriptionRequests:[], lyricsCache:{}, profilePhotoUrl:null, ownedSongs:[], adminTab:'accounts', adminQuery:'', adminStatus:'all', adminPriority:false, playlistInviteHandled:false, adminUserIds:[], adminView:'overview', artistStudioView:'overview', podcastStudioView:'overview', selectedStudioAlbum:null, albumStreamCounts:{}, albumStreamLoading:{}, crossDeviceRefreshBound:false, mayaPaymentNotice:null, mayaReturnProcessing:false, subscriptionInviteProcessing:false, deactivationStatus:null });
+let accountStatusChannel=null;
+let accountStatusTimer=null;
+let accountStatusChecking=false;
 
 const HISTORY_CACHE_LIMIT = 80;
 const PODCAST_HISTORY_CACHE_LIMIT = 50;
@@ -635,6 +638,7 @@ function buildPlayback(songId, queueIds, opts = {}) {
   return { queue, order, pos };
 }
 async function playSong(songId, queueIds = null, opts = {}) {
+  await requirePlaybackAccess();
   const id = Number(songId);
   const cur = state.player, audio = document.getElementById('sw-audio');
   if (!opts.order && cur?.kind === 'song' && Number(cur.id) === id && audio) { if (audio.paused) await audio.play(); else audio.pause(); return; }
@@ -722,6 +726,7 @@ function startPlayer(details) {
 }
 function bindPlayerBar(audio, details, token) {
   let seeking = false;
+  audio.addEventListener('play',()=>{void (async()=>{if(!(await verifyAccountAccess({silent:true}))){audio.pause();}})();});
   const podcast = details.kind === 'podcast';
   const live = () => token === state.playerToken;
   const dur = () => (audio.duration > 0 && isFinite(audio.duration) ? audio.duration : Number(details.duration) || 0);
@@ -1897,7 +1902,7 @@ function podcasts(){
  }else{
    shell(`<div class="hero hero-podcast"><div><span class="eyebrow">STORIES WORTH HEARING</span><h2>Podcasts for every mood.</h2><p>Discover active shows and listen to the latest episodes.</p><button class="button secondary" data-nav="podcast-studio">${icon('upload')} Podcast Studio</button></div><div class="hero-art">${icon('mic')}</div></div><div class="section-heading"><h2>Explore shows</h2><button class="text-link" data-nav="podcast-studio">Manage your podcasts</button></div><div class="cover-grid podcast-show-grid">${state.podcasts.map((p,i)=>showCard(p,i)).join('')||'<div class="empty">No active shows published yet.</div>'}</div>`,'Podcasts','Discover shows. Publishing and management live in Podcast Studio.');
  }
- document.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>action(async()=>{const ep=state.episodes.find(x=>String(x.episode_id)===b.dataset.episode);if(!ep?.audio_path)throw Error('Episode has no uploaded audio.');const u=check(await db.storage.from('podcast-audio').createSignedUrl(ep.audio_path,3600));startPlayer({kind:'podcast',id:ep.episode_id,title:ep.episode_title,artist:chosen?.show_title||'SoundWave podcasts',url:u.signedUrl,duration:ep.duration_seconds,resumeAt:Number(state.podcastHistory.find(h=>String(h.episode_id)===String(ep.episode_id)&&Number(h.resume_position_seconds)>5)?.resume_position_seconds)||0});}));
+ document.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>action(async()=>{await requirePlaybackAccess();const ep=state.episodes.find(x=>String(x.episode_id)===b.dataset.episode);if(!ep?.audio_path)throw Error('Episode has no uploaded audio.');const u=check(await db.storage.from('podcast-audio').createSignedUrl(ep.audio_path,3600));startPlayer({kind:'podcast',id:ep.episode_id,title:ep.episode_title,artist:chosen?.show_title||'SoundWave podcasts',url:u.signedUrl,duration:ep.duration_seconds,resumeAt:Number(state.podcastHistory.find(h=>String(h.episode_id)===String(ep.episode_id)&&Number(h.resume_position_seconds)>5)?.resume_position_seconds)||0});}));
 }
 
 function podcastStudioAnalytics(){
@@ -2297,12 +2302,52 @@ function admin(){if(!hasAdminAccess())return discoverPage();
  const podRows=pods.map(p=>`<tr data-admin-row data-search="${esc(`${p.show_title||'Podcast'} ${p.category||''}`.toLowerCase())}" data-priority="${p.is_active===false?'true':'false'}" data-sort-name="${esc((p.show_title||'Podcast').toLowerCase())}" data-sort-status="${p.is_active===false?'inactive':'active'}"><td data-label="Podcast"><div class="entity-cell">${p.cover_path&&state.coverUrls[p.cover_path]?`<img class="admin-cover" src="${esc(state.coverUrls[p.cover_path])}" alt="">`:`<span class="member-avatar">${icon('mic')}</span>`}<strong>${esc(p.show_title||'Podcast')}</strong></div></td><td data-label="Category">${esc(p.category||'—')}</td><td data-label="Episodes">${state.episodes.filter(e=>Number(e.show_id)===Number(p.show_id)).length}</td><td data-label="Status">${cellStatus(p.is_active)}</td><td data-label="Actions"><button class="button secondary sm" data-entity="podcast_show" data-name="${esc(p.show_title||'Podcast')}" data-id="${p.show_id}" data-active="${p.is_active===false?'true':'false'}">${p.is_active===false?'Restore':'Deactivate'}</button></td></tr>`).join('');
  const table=(heads,rows,emptyHtml)=>rows?`<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${heads.map(([k,l])=>`<th><button type="button" data-admin-sort="${k}">${l}${k==='name'?' ↕':''}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`:emptyHtml;
  const paymentCards=requests.map(r=>`<article class="payment-request-card" data-admin-row data-search="${esc(`${r.display_name||''} ${r.plan_name||''} ${r.reference_number||''} ${r.payment_method||''}`.toLowerCase())}" data-sort-status="${String(r.status||'').toLowerCase()==='pending'?'inactive':'active'}" data-priority="${String(r.status||'').toLowerCase()==='pending'?'true':'false'}"><div class="entity-cell"><span class="member-avatar">${esc((r.display_name||'U')[0].toUpperCase())}</span><div><strong>${esc(r.display_name||String(r.user_id).slice(0,8))}</strong><small>${esc(r.plan_name||'Subscription plan')}</small></div></div><dl><div><dt>Amount</dt><dd>${r.amount!=null?`₱${Number(r.amount).toFixed(2)}`:'—'}</dd></div><div><dt>Method</dt><dd>${esc(r.payment_method||'—')}</dd></div><div><dt>Reference</dt><dd>${esc(r.reference_number||'—')}</dd></div><div><dt>Status</dt><dd>${esc(r.status||'Pending')}</dd></div></dl>${String(r.status||'').toLowerCase()==='pending'?`<div class="payment-actions"><button class="button reject-btn" data-review-request="${r.request_id}" data-request-name="${esc(r.display_name||'this user')}" data-approve="false">Reject</button><button class="button approve-btn" data-review-request="${r.request_id}" data-request-name="${esc(r.display_name||'this user')}" data-approve="true">Approve</button></div>`:''}</article>`).join('');
- shell(`<section class="workspace-hero moderation-hero"><div><span class="eyebrow">ADMIN WORKSPACE</span><h2>Admin Dashboard</h2><p>Switch between overview, analytics, moderation, and payments so the workspace feels less clustered.</p></div><span class="hero-vinyl">${icon('shield')}</span></section>
- <nav class="admin-view-tabs" aria-label="Admin views"><button class="${state.adminView==='overview'?'active':''}" data-admin-view-btn="overview">Overview</button><button class="${state.adminView==='analytics'?'active':''}" data-admin-view-btn="analytics">Analytics</button><button class="${state.adminView==='moderation'?'active':''}" data-admin-view-btn="moderation">Moderation</button><button class="${state.adminView==='payments'?'active':''}" data-admin-view-btn="payments">Payments</button></nav>
- <section class="admin-block" data-admin-view="overview" ${state.adminView!=='overview'?'hidden':''}><section class="admin-overview"><button type="button" data-admin-target="accounts" aria-label="Open Accounts moderation"><small>Active accounts</small><strong>${activeUsers}</strong><span>Review accounts</span></button><button type="button" data-admin-target="artists" aria-label="Open Artists moderation"><small>Artists</small><strong>${artists.length}</strong><span>Catalog owners</span></button><button type="button" data-admin-target="songs" aria-label="Open Songs moderation"><small>Songs</small><strong>${songs.length}</strong><span>Tracks in catalog</span></button><button type="button" data-admin-target="podcasts" aria-label="Open Podcasts moderation"><small>Podcasts</small><strong>${pods.length}</strong><span>Published shows</span></button><button type="button" data-admin-target="payments" aria-label="Open Payments moderation"><small>Pending payments</small><strong>${pending}</strong><span>Needs a decision</span></button></section><section class="admin-summary-grid"><article class="admin-summary-card"><span class="eyebrow">QUICK ACTION</span><h3>Promote trusted users</h3><p>Use the Accounts queue to grant admin access only to trusted users.</p><button class="button secondary" type="button" data-admin-open="accounts">Open accounts</button></article><article class="admin-summary-card"><span class="eyebrow">PAYMENTS</span><h3>${pending} request${pending===1?'':'s'} pending</h3><p>Subscription approvals are grouped in a dedicated Payments view so they do not crowd moderation.</p><button class="button secondary" type="button" data-admin-open="payments">Open payments</button></article><article class="admin-summary-card"><span class="eyebrow">CATALOG</span><h3>${songs.length + pods.length} content items</h3><p>Songs and podcasts can be reviewed from the Moderation view with search, status filters, and attention flags.</p><button class="button secondary" type="button" data-admin-open="songs">Open moderation</button></article></section></section>
- <section class="admin-block" data-admin-view="analytics" ${state.adminView!=='analytics'?'hidden':''}>${adminChartsHtml(users)}</section>
- <section class="admin-block" data-admin-view="moderation" ${state.adminView!=='moderation'?'hidden':''}><section class="moderation-commandbar" aria-label="Moderation tools"><div class="moderation-search">${icon('search')}<input id="admin-search" type="search" autocomplete="off" placeholder="Search the current moderation queue" value="${esc(state.adminQuery||'')}" aria-label="Search moderation data"></div><select id="admin-status-filter" aria-label="Filter moderation status"><option value="all" ${state.adminStatus==='all'?'selected':''}>All statuses</option><option value="active" ${state.adminStatus==='active'?'selected':''}>Active only</option><option value="inactive" ${state.adminStatus==='inactive'?'selected':''}>Inactive only</option></select><button type="button" class="button secondary ${state.adminPriority?'active':''}" id="admin-priority-filter" aria-pressed="${state.adminPriority}">${icon('shield')} Needs attention</button><span class="moderation-visible-count" id="moderation-visible-count"></span></section><nav class="admin-tabbar" aria-label="Moderation sections"><button class="${state.adminTab==='accounts'?'active':''}" data-admin-tab="accounts">Accounts</button><button class="${state.adminTab==='artists'?'active':''}" data-admin-tab="artists">Artists</button><button class="${state.adminTab==='songs'?'active':''}" data-admin-tab="songs">Songs</button><button class="${state.adminTab==='podcasts'?'active':''}" data-admin-tab="podcasts">Podcasts</button></nav><section class="admin-panel" data-admin-panel="accounts" ${state.adminTab!=='accounts'?'hidden':''}>${table([['name','Account'],['type','Type'],['joined','Joined'],['status','Status'],['actions','Actions']],accountRows,empty('◎','No account data','Account moderation data will appear when the existing admin RPC returns rows.'))}</section><section class="admin-panel" data-admin-panel="artists" ${state.adminTab!=='artists'?'hidden':''}>${table([['name','Artist'],['country','Country'],['songs','Songs'],['status','Status'],['actions','Actions']],artistRows,empty('♫','No artists to review','Artist accounts will appear here.'))}</section><section class="admin-panel" data-admin-panel="songs" ${state.adminTab!=='songs'?'hidden':''}><div class="admin-song-manager">${songs.length?songs.map(row=>{const live=state.songs.find(s=>Number(s.song_id)===Number(row.song_id))||row;const artist=live.album?.artist?.artist_name||row.artist_name||'—',album=live.album?.album_title||row.album_title||'—';return `<article class="admin-song-card" data-admin-row data-search="${esc(`${row.song_title||'Song'} ${artist} ${album}`.toLowerCase())}" data-priority="${row.is_active===false?'true':'false'}" data-sort-name="${esc((row.song_title||'Song').toLowerCase())}" data-sort-status="${row.is_active===false?'inactive':'active'}">${albumArt(live,'large')}<div class="admin-song-card-copy"><div class="card-title-line"><strong>${esc(row.song_title||'Song')}</strong>${cellStatus(row.is_active)}</div><small>${esc(artist)} · ${esc(album)}</small><div class="song-manager-meta"><span>${nice(row.duration_seconds||live.duration_seconds)}</span><span>${esc(state.genres.find(g=>Number(g.genre_id)===Number(live.genre_id))?.genre_name||'Uncategorized')}</span></div></div><button class="button secondary sm" data-entity="song" data-name="${esc(row.song_title||'Song')}" data-id="${row.song_id}" data-active="${row.is_active===false?'true':'false'}">${row.is_active===false?'Restore':'Deactivate'}</button></article>`;}).join(''):empty('♪','No songs to review','The active catalog will appear here.')}</div></section><section class="admin-panel" data-admin-panel="podcasts" ${state.adminTab!=='podcasts'?'hidden':''}>${table([['name','Podcast'],['category','Category'],['episodes','Episodes'],['status','Status'],['actions','Actions']],podRows,empty('◉','No podcasts to review','Published shows will appear here.'))}</section></section>
- <section class="admin-block" data-admin-view="payments" ${state.adminView!=='payments'?'hidden':''}><div class="payment-grid">${paymentCards||empty('₱','No payment requests','There are no subscription requests waiting for review.')}</div></section>
+ shell(`<div class="admin-ref-shell">
+  <aside class="admin-ref-nav" aria-label="Admin navigation">
+    <div class="admin-ref-brand"><span>${icon('music')}</span><strong>SoundWave</strong></div>
+    <button class="${state.adminView==='overview'?'active':''}" data-admin-view-btn="overview">${icon('home')}<span>Overview</span></button>
+    <button class="${state.adminView==='moderation'&&state.adminTab==='accounts'?'active':''}" data-admin-open="accounts">${icon('users')}<span>User Management</span></button>
+    <button class="${state.adminView==='moderation'?'active':''}" data-admin-open="songs">${icon('shield')}<span>Content Review</span></button>
+    <button class="${state.adminView==='payments'?'active':''}" data-admin-view-btn="payments">${icon('check')}<span>Payments</span></button>
+    <button class="${state.adminView==='analytics'?'active':''}" data-admin-view-btn="analytics">${icon('chart')}<span>Analytics</span></button>
+  </aside>
+  <section class="admin-ref-main">
+    <header class="admin-ref-header"><div><span class="eyebrow">ADMIN</span><h1>Platform overview</h1><p>Monitor users, content, payments and platform activity.</p></div><select class="admin-period-select" aria-label="Dashboard period"><option>Last 30 days</option></select></header>
+
+    <section class="admin-block" data-admin-view="overview" ${state.adminView!=='overview'?'hidden':''}>
+      <div class="admin-ref-kpis">
+        <article><div><small>Total users</small><strong>${users.length}</strong><span>${activeUsers} active accounts</span></div><i class="kpi-icon">${icon('users')}</i></article>
+        <article><div><small>Active creators</small><strong>${artists.filter(a=>a.is_active!==false).length}</strong><span>${artists.length} artist profiles</span></div><i class="kpi-icon">${icon('music')}</i></article>
+        <article><div><small>Pending reviews</small><strong>${songs.filter(x=>x.is_active===false).length+pods.filter(x=>x.is_active===false).length}</strong><span>Content needing attention</span></div><i class="kpi-icon warning">${icon('shield')}</i></article>
+        <article><div><small>Payment requests</small><strong>${pending}</strong><span>Awaiting decision</span></div><i class="kpi-icon payment">₱</i></article>
+      </div>
+      <div class="admin-ref-grid">
+        <section class="admin-ref-card admin-ref-queue"><div class="admin-ref-card-head"><div><h2>Content queue</h2><p>Review catalog items and account status from one place.</p></div><button type="button" class="text-link" data-admin-open="songs">View all</button></div>
+          <div class="admin-ref-filter-pills"><button class="active" type="button" data-admin-open="songs">All (${songs.length+pods.length})</button><button type="button" data-admin-open="songs">Songs (${songs.length})</button><button type="button" data-admin-open="podcasts">Podcasts (${pods.length})</button><button type="button" data-admin-open="accounts">Users (${users.length})</button></div>
+          <div class="admin-ref-preview-table"><div class="preview-head"><span>Content</span><span>Type</span><span>Submitted by</span><span>Status</span><span></span></div>
+          ${songs.slice(0,5).map(row=>{const live=state.songs.find(x=>Number(x.song_id)===Number(row.song_id))||row;const art=live.album?.artist?.artist_name||row.artist_name||'Artist';return `<div class="preview-row">${albumArt(live,'tiny')}<div><strong>${esc(row.song_title||'Song')}</strong><small>${esc(live.album?.album_title||row.album_title||'Release')}</small></div><span>Song</span><span>${esc(art)}</span>${cellStatus(row.is_active)}<button type="button" class="preview-action" data-admin-open="songs">•••</button></div>`;}).join('')||'<div class="admin-ref-empty">No songs in the review queue.</div>'}
+          </div>
+        </section>
+        <aside class="admin-ref-side">
+          <section class="admin-ref-card"><div class="admin-ref-card-head"><div><h2>Pending activity</h2><p>Items requiring an admin decision.</p></div></div><div class="admin-ref-activity"><button type="button" data-admin-open="accounts"><span>${icon('users')}</span><div><strong>${users.filter(x=>x.is_active===false).length} suspended accounts</strong><small>Review account access</small></div></button><button type="button" data-admin-open="songs"><span>${icon('music')}</span><div><strong>${songs.filter(x=>x.is_active===false).length} inactive songs</strong><small>Review catalog status</small></div></button><button type="button" data-admin-open="payments"><span>₱</span><div><strong>${pending} payment requests</strong><small>Approve or reject requests</small></div></button></div></section>
+          <section class="admin-ref-card"><div class="admin-ref-card-head"><div><h2>Account mix</h2><p>Current platform roles.</p></div></div>${roleDistributionHtml(users)}</section>
+        </aside>
+      </div>
+    </section>
+
+    <section class="admin-block" data-admin-view="analytics" ${state.adminView!=='analytics'?'hidden':''}>${adminChartsHtml(users)}</section>
+
+    <section class="admin-block" data-admin-view="moderation" ${state.adminView!=='moderation'?'hidden':''}>
+      <div class="admin-ref-card admin-ref-full"><div class="admin-ref-card-head"><div><span class="eyebrow">CONTENT REVIEW</span><h2>Moderation queue</h2><p>Search, filter and take action on users and content.</p></div></div>
+      <section class="moderation-commandbar" aria-label="Moderation tools"><div class="moderation-search">${icon('search')}<input id="admin-search" type="search" autocomplete="off" placeholder="Search the current moderation queue" value="${esc(state.adminQuery||'')}" aria-label="Search moderation data"></div><select id="admin-status-filter" aria-label="Filter moderation status"><option value="all" ${state.adminStatus==='all'?'selected':''}>All statuses</option><option value="active" ${state.adminStatus==='active'?'selected':''}>Active only</option><option value="inactive" ${state.adminStatus==='inactive'?'selected':''}>Inactive only</option></select><button type="button" class="button secondary ${state.adminPriority?'active':''}" id="admin-priority-filter" aria-pressed="${state.adminPriority}">${icon('shield')} Needs attention</button><span class="moderation-visible-count" id="moderation-visible-count"></span></section>
+      <nav class="admin-tabbar" aria-label="Moderation sections"><button class="${state.adminTab==='accounts'?'active':''}" data-admin-tab="accounts">Accounts</button><button class="${state.adminTab==='artists'?'active':''}" data-admin-tab="artists">Artists</button><button class="${state.adminTab==='songs'?'active':''}" data-admin-tab="songs">Songs</button><button class="${state.adminTab==='podcasts'?'active':''}" data-admin-tab="podcasts">Podcasts</button></nav>
+      <section class="admin-panel" data-admin-panel="accounts" ${state.adminTab!=='accounts'?'hidden':''}>${table([['name','Account'],['type','Type'],['joined','Joined'],['status','Status'],['actions','Actions']],accountRows,empty('◎','No account data','Account moderation data will appear when the existing admin RPC returns rows.'))}</section><section class="admin-panel" data-admin-panel="artists" ${state.adminTab!=='artists'?'hidden':''}>${table([['name','Artist'],['country','Country'],['songs','Songs'],['status','Status'],['actions','Actions']],artistRows,empty('♫','No artists to review','Artist accounts will appear here.'))}</section><section class="admin-panel" data-admin-panel="songs" ${state.adminTab!=='songs'?'hidden':''}><div class="admin-song-manager">${songs.length?songs.map(row=>{const live=state.songs.find(x=>Number(x.song_id)===Number(row.song_id))||row;const artist=live.album?.artist?.artist_name||row.artist_name||'—',album=live.album?.album_title||row.album_title||'—';return `<article class="admin-song-card" data-admin-row data-search="${esc(`${row.song_title||'Song'} ${artist} ${album}`.toLowerCase())}" data-priority="${row.is_active===false?'true':'false'}" data-sort-name="${esc((row.song_title||'Song').toLowerCase())}" data-sort-status="${row.is_active===false?'inactive':'active'}">${albumArt(live,'large')}<div class="admin-song-card-copy"><div class="card-title-line"><strong>${esc(row.song_title||'Song')}</strong>${cellStatus(row.is_active)}</div><small>${esc(artist)} · ${esc(album)}</small><div class="song-manager-meta"><span>${nice(row.duration_seconds||live.duration_seconds)}</span><span>${esc(state.genres.find(g=>Number(g.genre_id)===Number(live.genre_id))?.genre_name||'Uncategorized')}</span></div></div><button class="button secondary sm" data-entity="song" data-name="${esc(row.song_title||'Song')}" data-id="${row.song_id}" data-active="${row.is_active===false?'true':'false'}">${row.is_active===false?'Restore':'Deactivate'}</button></article>`;}).join(''):empty('♪','No songs to review','The active catalog will appear here.')}</div></section><section class="admin-panel" data-admin-panel="podcasts" ${state.adminTab!=='podcasts'?'hidden':''}>${table([['name','Podcast'],['category','Category'],['episodes','Episodes'],['status','Status'],['actions','Actions']],podRows,empty('◉','No podcasts to review','Published shows will appear here.'))}</section>
+      </div>
+    </section>
+
+    <section class="admin-block" data-admin-view="payments" ${state.adminView!=='payments'?'hidden':''}><div class="admin-ref-card admin-ref-full"><div class="admin-ref-card-head"><div><span class="eyebrow">PAYMENTS</span><h2>Subscription requests</h2><p>Review and decide pending Premium payments.</p></div></div><div class="payment-grid">${paymentCards||empty('₱','No payment requests','There are no subscription requests waiting for review.')}</div></div></section>
+  </section>
+ </div>
  <dialog class="sw-modal confirm-dialog" id="admin-confirm-dialog"><div class="modal-head"><div><span class="eyebrow">CONFIRM ACTION</span><h2 id="admin-confirm-title">Are you sure?</h2></div><button type="button" class="modal-close" data-close-modal aria-label="Close confirmation">${icon('close')}</button></div><p id="admin-confirm-message" class="confirm-message"></p><div class="dialog-actions"><button type="button" class="button secondary" data-close-modal>Cancel</button><button type="button" class="button" id="admin-confirm-action">Confirm</button></div></dialog>`,'Admin Dashboard','Manage SoundWave with clearer sections.');
  const setAdminView=(view)=>{state.adminView=view;document.querySelectorAll('[data-admin-view-btn]').forEach(x=>x.classList.toggle('active',x.dataset.adminViewBtn===view));document.querySelectorAll('[data-admin-view]').forEach(x=>x.hidden=x.dataset.adminView!==view);};
  const switchTab=(tab,{scroll=true}={})=>{state.adminTab=tab;document.querySelectorAll('[data-admin-tab]').forEach(x=>x.classList.toggle('active',x.dataset.adminTab===tab));document.querySelectorAll('[data-admin-panel]').forEach(p=>p.hidden=p.dataset.adminPanel!==tab);document.querySelectorAll('.admin-overview [data-admin-target]').forEach(x=>{const on=x.dataset.adminTarget===tab;x.classList.toggle('active',on);x.setAttribute('aria-pressed',String(on));});if(scroll&&state.adminView==='moderation') document.querySelector('.admin-tabbar')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});};
@@ -2461,8 +2506,43 @@ function bindCrossDeviceRefresh(){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')lastHiddenAt=Date.now();else if(!hasOpenFileWorkflow()&&Date.now()-lastHiddenAt>1200)void refreshCrossDeviceMetrics();});
   window.addEventListener('focus',()=>{setTimeout(()=>{if(!hasOpenFileWorkflow())void refreshCrossDeviceMetrics();},500);});
 }
+async function handleSuspendedAccount(message='This account has been suspended by an administrator.'){
+  if(state.profile) state.profile={...state.profile,is_active:false};
+  try{await stopAudio();}catch(e){console.warn('Could not stop playback during suspension',e);}
+  state.player=null;
+  render();
+  toast(message,true);
+}
+async function verifyAccountAccess({silent=false}={}){
+  if(!state.user?.id||accountStatusChecking)return state.profile?.is_active!==false;
+  accountStatusChecking=true;
+  try{
+    const {data,error}=await db.from('users').select('is_active').eq('user_id',state.user.id).maybeSingle();
+    if(error){if(!silent)console.warn('Account access check failed',error);return state.profile?.is_active!==false;}
+    const active=data?.is_active!==false;
+    if(state.profile)state.profile={...state.profile,is_active:active};
+    if(!active){await handleSuspendedAccount();return false;}
+    return true;
+  }finally{accountStatusChecking=false;}
+}
+async function requirePlaybackAccess(){
+  const allowed=await verifyAccountAccess();
+  if(!allowed)throw Error('This account is suspended. Playback is disabled until an administrator restores it.');
+  return true;
+}
+function setupAccountAccessGuard(){
+  if(!db||!state.user?.id)return;
+  if(accountStatusTimer)clearInterval(accountStatusTimer);
+  accountStatusTimer=setInterval(()=>{if(state.user?.id)void verifyAccountAccess({silent:true});},5000);
+  if(accountStatusChannel){db.removeChannel(accountStatusChannel);accountStatusChannel=null;}
+  accountStatusChannel=db.channel(`soundwave-account-access-${state.user.id}`)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'users',filter:`user_id=eq.${state.user.id}`},payload=>{
+      if(payload.new?.is_active===false)void handleSuspendedAccount();
+    }).subscribe();
+}
 function setupRealtime(){
  if(!db||!state.user)return;
+ setupAccountAccessGuard();
  if(realtimeChannel)db.removeChannel(realtimeChannel);
  if(adminStreamChannel){db.removeChannel(adminStreamChannel);adminStreamChannel=null;}
  if(creatorStreamChannel){db.removeChannel(creatorStreamChannel);creatorStreamChannel=null;}
@@ -2598,7 +2678,7 @@ async function completeOAuthReturn(){
   // delivered directly to the SPA; Google must redirect to Supabase first.
   const rawCode=params.get('code')||'';
   if(/^4\//.test(rawCode)){
-    const err=new Error('Google OAuth is returning directly to SoundWave. In Google Cloud, set the Authorized redirect URI to the Supabase callback URL, not the Vercel app URL.');
+    const err=new Error('Google returned a raw authorization code directly to SoundWave. In Google Cloud Console, the Authorized redirect URI must be exactly https://azqbzyxknfdwfuqevbrd.supabase.co/auth/v1/callback. Remove any soundwave-gold.vercel.app redirect URI from the Google OAuth client.');
     err.code='google_redirect_misconfigured';
     cleanOAuthUrl();
     throw err;
