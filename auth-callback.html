@@ -20,16 +20,24 @@ const fail=(message)=>{loader.hidden=true;statusEl.textContent='Google sign-in c
 retry.onclick=()=>location.replace('/');
 (async()=>{
  try{
-   const params=new URLSearchParams(location.search);const queryError=params.get('error_description')||params.get('error');
+   const params=new URLSearchParams(location.search);
+   const queryError=params.get('error_description')||params.get('error');
    if(queryError)throw new Error(queryError);
-   const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
+   const code=params.get('code')||'';
+   if(/^4\//.test(code))throw new Error('Google is redirecting directly to SoundWave. In Google Cloud Console, set the Authorized redirect URI to exactly https://azqbzyxknfdwfuqevbrd.supabase.co/auth/v1/callback and remove any soundwave-gold.vercel.app URI from that Google OAuth client.');
+   const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}});
    let session=null;
-   for(let i=0;i<40;i++){
-     const {data,error}=await db.auth.getSession();if(error)throw error;
-     if(data?.session?.user){session=data.session;break;}
-     await new Promise(r=>setTimeout(r,150));
+   if(code){
+     const {data,error}=await db.auth.exchangeCodeForSession(code);
+     if(error)throw error;
+     session=data?.session||null;
    }
-   if(!session)throw new Error('Supabase did not create a session from the Google callback. Verify that this callback page is included in Supabase Redirect URLs.');
+   if(!session){
+     const {data,error}=await db.auth.getSession();
+     if(error)throw error;
+     session=data?.session||null;
+   }
+   if(!session?.user)throw new Error('Supabase did not create a Google session. Verify the Google callback URI and Supabase Redirect URLs.');
    sessionStorage.removeItem('soundwave-oauth-return');sessionStorage.removeItem('soundwave-oauth-error');
    statusEl.textContent='Signed in. Opening SoundWave…';
    location.replace('/#/discover');
