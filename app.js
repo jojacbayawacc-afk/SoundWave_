@@ -99,7 +99,7 @@ function persistPlayerSnapshot(data = state.player, resumeAt = null) {
     savedAt: new Date().toISOString()
   });
 }
-Object.assign(state,{insightHistory:[],listeningStats:null,topWeekSongs:[],friendActivity:[],friendNow:[],artistThirtyDay:[],artistTopListeners:[],adminAnalyticsHistory:[],analyticsSongNames:{},recentSearches:[],playlistPresence:[],competitionLoaded:false,podcastStudioHistory:[],podcastRecSignals:{categories:{},shows:[]},discoverExpanded:{albums:false,curated:false}});
+Object.assign(state,{insightHistory:[],listeningStats:null,topWeekSongs:[],friendActivity:[],friendNow:[],artistThirtyDay:[],artistTopListeners:[],adminAnalyticsHistory:[],analyticsSongNames:{},artistPopularity:{},recentSearches:[],playlistPresence:[],competitionLoaded:false,podcastStudioHistory:[],podcastRecSignals:{categories:{},shows:[]},discoverExpanded:{albums:false,curated:false}});
 const nice = (n) => Number.isFinite(Number(n)) ? `${Math.floor(n/60)}:${String(Math.floor(n%60)).padStart(2,'0')}` : '—';
 const ANALYTICS_WINDOW_DAYS = 30;
 const val = (id) => document.getElementById(id)?.value?.trim();
@@ -185,6 +185,9 @@ async function routeLoad() {
     await playlistDetail();
   } else if (state.page === 'podcasts' && state.selectedShow) {
     await showDetail();
+  } else if (state.page === 'artist-detail' && state.selectedArtist) {
+    await loadArtistPopularity(state.selectedArtist);
+    render();
   } else if (state.page === 'podcast-studio') {
     await refreshPodcastStudioMetrics();
     render();
@@ -454,8 +457,8 @@ const nav = [['music','♫','Search'],['artists','♥','Artists'],['playlists','
 // Listener tools are shared by Listener, Artist and Admin sessions.
 function hasArtistAccess(){return state.profile?.account_type === 'Artist' && Boolean(state.artist?.is_active);}
 function hasAdminAccess(){return state.admin === true;}
-function primaryDashboard(){return hasArtistAccess()?'artist-dashboard':hasAdminAccess()?'admin-dashboard':'discover';}
-function defaultLanding(){return hasArtistAccess()?'artist-dashboard':hasAdminAccess()?'admin-dashboard':'discover';}
+function primaryDashboard(){return hasAdminAccess()?'admin-dashboard':hasArtistAccess()?'artist-dashboard':'discover';}
+function defaultLanding(){return hasAdminAccess()?'admin-dashboard':hasArtistAccess()?'artist-dashboard':'discover';}
 function navigate(page, extras = {}) {
   if (!pageAllowed(page)) return toast('This page is not available for your account.', true);
   if (page === 'playlists' && !('selectedPlaylist' in extras)) state.selectedPlaylist = null;
@@ -526,13 +529,13 @@ function shell(content, title, desc) {
       : hasArtistAccess()
         ? `<button data-nav="studio">${icon('upload')} Artist Studio</button>`
         : `<button data-nav="discover">${icon('home')} Discover</button>`;
-  const mobileDashboard = hasArtistAccess() ? ['artist-dashboard','upload','Artist'] : hasAdminAccess() ? ['admin-dashboard','shield','Admin'] : ['discover','home','Discover'];
+  const mobileDashboard = hasAdminAccess() ? ['admin-dashboard','shield','Admin'] : hasArtistAccess() ? ['artist-dashboard','upload','Artist'] : ['discover','home','Discover'];
   const homeTarget = primaryDashboard();
-  const homeLabel = hasArtistAccess() ? 'Artist Dashboard' : hasAdminAccess() ? 'Admin Dashboard' : 'Discover';
+  const homeLabel = hasAdminAccess() ? 'Admin Dashboard' : hasArtistAccess() ? 'Artist Dashboard' : 'Discover';
   const premiumMenuBadge = isPremiumUser() ? `<span class="mini-premium-chip">${icon('check')} Premium</span>` : '';
   const profileMenu = `<div class="profile-menu" id="profile-menu" hidden><div class="profile-menu-head"><div class="profile-menu-user"><strong>${esc(display)}</strong><small>${esc(role)}</small></div>${premiumMenuBadge}</div><span class="profile-menu-sep" aria-hidden="true"></span>${roleMenuItems}<button data-nav="profile">${icon('users')} Profile</button><button data-nav="${followNav()}">${icon('users')} ${followLabel()}</button><button data-nav="podcast-studio">${icon('mic')} Podcast Studio</button><button data-nav="plans">${icon('check')} ${isPremiumUser()?'Manage Premium':'Upgrade to Premium'}</button>${isPremiumUser() ? `<button data-nav="downloads">${icon('download')} Downloads</button>` : ''}<button data-nav="history">${icon('clock')} Recently played</button><span class="profile-menu-sep" aria-hidden="true"></span><button id="profile-signout">${icon('forward')} Log out</button></div>`;
   $('#app').innerHTML = `<div class="app-top"><div class="app-top-left"><button type="button" class="top-logo home-btn" data-nav="${homeTarget}" aria-label="Open ${homeLabel}">${icon('home')}</button><button type="button" class="history-btn" id="nav-back" aria-label="Go back" ${state.hist.i > 0 ? '' : 'disabled'}>${icon('back')}</button><button type="button" class="history-btn" id="nav-forward" aria-label="Go forward" ${state.hist.i < state.hist.max ? '' : 'disabled'}>${icon('forward')}</button>${searchFieldHtml('global-search','global-search','What do you want to play?','Search SoundWave')}</div><div class="top-actions">${(hasArtistAccess()||hasAdminAccess())?`<button type="button" class="top-listen-btn" data-nav="discover" aria-label="Listen to music">${icon('music')}<span>Listen</span></button>`:''}<span class="role-badge">${esc(role)}</span><div class="profile-wrap"><button type="button" class="avatar top-avatar ${isPremiumUser()?'premium-user':''}" id="profile-toggle" aria-label="Open profile menu" title="${esc(display)}">${state.profilePhotoUrl?`<img src="${esc(state.profilePhotoUrl)}" alt="${esc(display)}">`:esc(display[0]?.toUpperCase() || 'S')}</button>${profileMenu}</div></div></div>
-<div class="workspace"><aside class="sidebar ${state.libraryExpanded ? '' : 'library-collapsed'}" aria-label="Your library"><div class="library-head"><button type="button" class="library-toggle" id="library-toggle" aria-expanded="${state.libraryExpanded}" title="${state.libraryExpanded ? 'Collapse' : 'Expand'} your library">${icon('library')}<span>Your Library</span></button><button type="button" class="library-create-btn" data-create-playlist aria-label="Create playlist" title="Create playlist">${icon('plus')}</button></div><div class="library-tools" id="library-tools">${libraryToolsHtml()}</div><div class="library-filter-row" id="library-filters">${libraryChips()}</div><div class="library-scroll" id="library-list">${libraryListHtml()}</div></aside>
+<div class="workspace"><aside class="sidebar ${state.libraryExpanded ? '' : 'library-collapsed'}" aria-label="Your library"><div class="library-head"><button type="button" class="library-toggle" id="library-toggle" aria-expanded="${state.libraryExpanded}" title="${state.libraryExpanded ? 'Collapse' : 'Expand'} your library">${icon('library')}<span>Your Library</span></button><button type="button" class="library-create-btn" data-create-playlist aria-label="Create playlist" title="Create playlist">${icon('plus')}</button></div><div class="library-tools" id="library-tools">${libraryToolsHtml()}</div><div class="library-filter-shell"><div class="library-filter-row" id="library-filters">${libraryChips()}</div><button type="button" class="library-filter-arrow" id="library-filter-arrow" aria-label="Show more library filters" title="More filters">${icon('forward')}</button></div><div class="library-scroll" id="library-list">${libraryListHtml()}</div></aside>
 <main class="main" id="main-content" style="--tint:${tint}"><div class="dashboard-content"><div class="page-intro"><h1 class="page-title">${esc(title)}</h1></div><div class="page-body">${content}</div></div></main>
 <aside class="context-rail" id="context-rail" aria-label="Now playing">${railHtml()}</aside></div>
 <nav class="mobile-dock" aria-label="Mobile navigation">${[mobileDashboard, ['music', 'search', 'Search'], ['playlists', 'library', 'Library'], ['podcasts', 'mic', 'Podcasts'], ['profile', 'users', 'You']].map(([id, ico, label]) => `<button type="button" data-nav="${id}" class="${state.page === id ? 'active' : ''}">${icon(ico)}<small>${label}</small></button>`).join('')}</nav>${state.page==='playlists'?`<button type="button" class="mobile-create-playlist" data-create-playlist aria-label="Create playlist">${icon('plus')}<span>Create playlist</span></button>`:''}
@@ -565,6 +568,22 @@ function grad(i=0){return ['linear-gradient(135deg,#6564aa,#3a8069)','linear-gra
 function bindShared() {
   bindContent(document);
   document.querySelectorAll('[data-create-playlist]').forEach((b) => b.onclick = () => action(quickCreatePlaylist));
+  const libraryFilters=$('#library-filters'),libraryFilterArrow=$('#library-filter-arrow');
+  if(libraryFilters&&libraryFilterArrow){
+    const syncLibraryFilterArrow=()=>{
+      const max=Math.max(0,libraryFilters.scrollWidth-libraryFilters.clientWidth);
+      libraryFilterArrow.hidden=max<4;
+      libraryFilterArrow.classList.toggle('at-end',libraryFilters.scrollLeft>=max-4);
+      libraryFilterArrow.setAttribute('aria-label',libraryFilters.scrollLeft>=max-4?'Show previous library filters':'Show more library filters');
+    };
+    libraryFilterArrow.onclick=()=>{
+      const max=Math.max(0,libraryFilters.scrollWidth-libraryFilters.clientWidth),atEnd=libraryFilters.scrollLeft>=max-4;
+      libraryFilters.scrollTo({left:atEnd?0:Math.min(max,libraryFilters.scrollLeft+Math.max(120,libraryFilters.clientWidth*.72)),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+      setTimeout(syncLibraryFilterArrow,260);
+    };
+    libraryFilters.addEventListener('scroll',syncLibraryFilterArrow,{passive:true});
+    requestAnimationFrame(syncLibraryFilterArrow);
+  }
   document.querySelectorAll('[data-open-modal]').forEach((b) => b.onclick = () => {const d=document.getElementById(b.dataset.openModal);if(!d)return;dialogOpeners.set(d,b);d.showModal();});
   document.querySelectorAll('[data-close-modal]').forEach((b) => b.onclick = () => b.closest('dialog')?.close());document.querySelectorAll('dialog').forEach(d=>{if(d.dataset.focusReturnBound)return;d.dataset.focusReturnBound='1';d.addEventListener('close',()=>dialogOpeners.get(d)?.focus());});
   document.querySelectorAll('[data-switch-modal]').forEach((b) => b.onclick = () => { b.closest('dialog')?.close(); document.getElementById(b.dataset.switchModal)?.showModal(); });
@@ -1437,24 +1456,47 @@ async function playDownloaded(songId, pb = null) {
 // ---------- Right-hand "Now playing / Queue" panel ----------
 function downloadsPage(){if(!isPremiumUser())return plans();const rows=state.offlineDownloads;shell(`<section class="workspace-hero premium-hero"><div><span class="eyebrow">OFFLINE LIBRARY</span><h2>Your downloads.</h2><p>Premium downloads are stored encrypted in this browser for the signed-in account.</p></div><span class="hero-vinyl">↓</span></section><div class="section-heading"><h2>Downloaded music <span class="muted small">(${rows.length})</span></h2></div>${rows.length?`<div class="songlist">${rows.map((r,i)=>`<div class="songrow"><span class="tag">${i+1}</span><span class="placeholder-art tiny" style="background:${grad(i)}">♫</span><div class="grow"><strong>${escapeHtml(r.title)}</strong><small>${escapeHtml(r.artist)} · ${escapeHtml(r.album)}</small></div><span class="muted small">${nice(r.duration)}</span><button class="track-play" data-offline-play="${r.songId}">${icon('play')}</button><button class="button secondary sm" data-offline-remove="${r.songId}">Remove</button></div>`).join('')}</div>`:'<div class="empty">No downloads yet. Use a song’s ••• menu and choose Download.</div>'}<p class="footnote">The app rechecks Premium entitlement whenever you sign in. If entitlement expires, this local offline library is removed. Offline audio is encrypted at rest in this browser, but this does not protect it from malicious code running on the same SoundWave origin.</p>`,'Downloads',state.entitlement?.plan_name?`${state.entitlement.plan_name} offline listening`:'Premium offline listening');document.querySelectorAll('[data-offline-play]').forEach(b=>b.onclick=()=>action(()=>playDownloaded(Number(b.dataset.offlinePlay))));document.querySelectorAll('[data-offline-remove]').forEach(b=>b.onclick=()=>action(async()=>{await removeOfflineSong(Number(b.dataset.offlineRemove));render();toast('Download removed');}));}
 
+async function loadArtistPopularity(artistId){
+  const id=Number(artistId);
+  if(!id||!db)return;
+  const key=String(id);
+  try{
+    const {data,error}=await db.rpc('public_artist_song_stream_counts_v47',{p_artist_id:id});
+    if(error)throw error;
+    state.artistPopularity[key]=Object.fromEntries((data||[]).map(row=>[Number(row.song_id),Number(row.stream_count)||0]));
+  }catch(error){
+    console.warn('Public artist popularity unavailable:',error);
+    state.artistPopularity[key]=state.artistPopularity[key]||{};
+  }
+}
 function artistDetail() {
   const artist = state.artists.find((a) => Number(a.artist_id) === Number(state.selectedArtist));
   if (!artist) return artists();
-  const releases = songsByArtist(artist.artist_id);
+  const popularity=state.artistPopularity?.[String(artist.artist_id)]||{};
+  const releases = [...songsByArtist(artist.artist_id)].sort((a,b)=>(Number(popularity[b.song_id]||0)-Number(popularity[a.song_id]||0))||(Number(b.song_id)-Number(a.song_id)));
   const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id));
   const own = isOwnArtist(artist), fc = followerText(artist.artist_id);
   state.tint = tintFor(artist.artist_id);
   shell(`<div class="artist-sticky-bar" id="artist-sticky-bar"><span class="artist-sticky-avatar" style="background:${grad(artist.artist_id)}">${esc(artist.artist_name?.[0] || 'A')}</span><strong>${esc(artist.artist_name)}</strong>${releases.length ? `<button type="button" class="artist-sticky-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button>` : ''}</div><section class="artist-profile-hero" id="artist-profile-hero"><span class="artist-profile-avatar" style="background:${grad(artist.artist_id)}">${esc(artist.artist_name?.[0] || 'A')}</span><div><span class="coll-kind">Artist</span><h1 class="coll-title">${esc(artist.artist_name)}</h1><p class="coll-sub">${fc ? `<strong data-follower-count="${artist.artist_id}">${fc}</strong> · ` : ''}${albums.length} ${albums.length === 1 ? 'release' : 'releases'} · ${releases.length} ${releases.length === 1 ? 'song' : 'songs'}${artist.country ? ' · ' + esc(artist.country) : ''}</p></div></section>
 <div class="coll-actions artist-primary-actions">${releases.length ? `<button type="button" class="sw-big-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button>` : ''}${own ? `<button type="button" class="follow-btn" data-nav="followers">View your followers</button>` : followBtn(artist)}</div>
-${releases.length ? `<section class="artist-section"><div class="section-heading"><h2>Popular</h2></div>${trackTable(releases.slice(0, 10), { queue: ids(releases), showAlbum: false })}</section>` : ''}
+${releases.length ? `<section class="artist-section"><div class="section-heading"><div><h2>Popular</h2><span class="muted small">Ranked by qualified stream count</span></div></div>${trackTable(releases.slice(0, 10), { queue: ids(releases), showAlbum: false, extraLabel: 'Streams', extraClass: 'streams', extraCell: (song)=>Number(popularity[song.song_id]||0).toLocaleString() })}</section>` : ''}
 ${albums.length ? `<section class="shelf-section artist-section"><div class="section-heading"><h2>Discography</h2></div><div class="shelf">${albums.map(albumTile).join('')}</div></section>` : '<div class="empty">No published releases yet.</div>'}
 ${artist.bio ? `<section class="about-card artist-section"><h2>About</h2><p>${esc(artist.bio)}</p></section>` : ''}`, '', '');
 }
 function bindArtistScrollBehavior(){
   const main=document.querySelector('.main'),hero=document.getElementById('artist-profile-hero'),bar=document.getElementById('artist-sticky-bar');
   if(!main||!hero||!bar)return;
-  const update=()=>{const threshold=Math.max(88,hero.offsetHeight*.58);bar.classList.toggle('show',main.scrollTop>threshold);document.body.classList.toggle('artist-scrolled',main.scrollTop>threshold);};
-  main.addEventListener('scroll',update,{passive:true});update();
+  let shown=false,raf=0;
+  const update=()=>{
+    raf=0;
+    const threshold=Math.max(96,hero.offsetHeight*.58),top=main.scrollTop;
+    const next=shown?top>Math.max(24,threshold-28):top>threshold;
+    if(next!==shown){shown=next;bar.classList.toggle('show',shown);document.body.classList.toggle('artist-scrolled',shown);}
+    if(top<=2){shown=false;bar.classList.remove('show');document.body.classList.remove('artist-scrolled');}
+  };
+  const onScroll=()=>{if(!raf)raf=requestAnimationFrame(update);};
+  main.addEventListener('scroll',onScroll,{passive:true});
+  update();
 }
 function songRows(rows, showAdd = false, queueIds = null) { return trackTable(rows, { queue: queueIds?.length ? queueIds : ids(rows) }); }
 function recommendationShelf(){
@@ -1564,12 +1606,17 @@ function artistDashboard(){if(!hasArtistAccess())return discoverPage();
  const owned=state.ownedSongs||[];
  shell(`<section class="workspace-hero artist-hero"><div><span class="eyebrow">ARTIST STUDIO</span><h2>Your sound. Your space.</h2><p>See how your releases are performing, then jump into publishing when you are ready.</p><div class="hero-actions"><button class="button" data-nav="studio">${icon('upload')} Manage releases</button></div></div><span class="hero-vinyl">${icon('album')}</span></section>${artistAnalyticsHtml()}<div class="section-heading"><h2>Recent releases</h2><button class="text-link" data-nav="studio">Manage →</button></div><div class="release-grid">${owned.filter(x=>x.is_active).slice(0,5).map(artTile).join('')||quickTile('Create your first album','Start in Artist Studio','', 'studio','album',2)}</div>`,'Artist Studio',`Welcome back, ${state.artist?.artist_name||'Artist'}.`);
 }
-function adminDashboard(){
-  // Keep the dedicated route for deep links and role landing, but render the
-  // complete administration workspace. Payments remain intentionally absent.
-  return admin();
+function adminDashboard(){if(!hasAdminAccess())return discoverPage();
+ const d=state.adminData||{},users=d.users||[],artists=d.artists||[],songs=d.songs||state.songs||[],pods=d.podcasts||[];
+ const activeUsers=users.filter(x=>x.is_active!==false).length,activeArtists=artists.filter(x=>x.is_active!==false).length;
+ const inactiveContent=songs.filter(x=>x.is_active===false).length+pods.filter(x=>x.is_active===false).length;
+ const chart=adminChartData();
+ shell(`<section class="workspace-hero admin-hero"><div><span class="eyebrow">SOUNDWAVE ADMIN</span><h2>Platform control, without the clutter.</h2><p>Monitor account health, catalog activity and qualified streams, then open Moderation when action is needed.</p><div class="hero-actions"><button class="button" data-nav="admin">${icon('shield')} Open moderation</button></div></div><span class="hero-vinyl">${icon('shield')}</span></section>
+ <section class="studio-stat-strip four admin-dashboard-stats"><div><small>Total users</small><strong data-count="${users.length}">${users.length}</strong><span>${activeUsers} active</span></div><div><small>Active creators</small><strong data-count="${activeArtists}">${activeArtists}</strong><span>${artists.length} artist profiles</span></div><div><small>Qualified streams</small><strong data-count="${chart.total}">${chart.total}</strong><span>Last 30 days</span></div><div><small>Needs attention</small><strong data-count="${inactiveContent}">${inactiveContent}</strong><span>Inactive content</span></div></section>
+ <div class="creator-summary-grid admin-dashboard-actions"><article><span class="eyebrow">MODERATION</span><h3>User & content review</h3><p>Manage accounts, artists, songs and podcasts with the protected admin controls.</p><button class="button secondary" data-nav="admin">${icon('shield')} Open moderation</button></article><article><span class="eyebrow">PERFORMANCE</span><h3>${chart.most?esc(chart.most.name):'No streams yet'}</h3><p>${chart.most?`${chart.most.value.toLocaleString()} qualified streams on the leading track.`:'Platform stream analytics will appear after qualified plays are recorded.'}</p><button class="button secondary" data-nav="admin">${icon('chart')} View analytics</button></article><article><span class="eyebrow">CATALOG</span><h3>${songs.length} songs · ${pods.length} podcasts</h3><p>${inactiveContent?`${inactiveContent} item${inactiveContent===1?'':'s'} currently inactive and worth reviewing.`:'No inactive catalog items need attention.'}</p><button class="button secondary" data-nav="admin">${icon('music')} Review catalog</button></article></div>
+ ${adminChartsHtml(users)}`,'Admin Dashboard',`Welcome back, ${state.profile?.display_name||'Admin'}.`);
 }
-function home(){const target=primaryDashboard();if(target==='artist-dashboard')return artistDashboard();if(target==='admin-dashboard')return admin();return discoverPage();}
+function home(){const target=primaryDashboard();if(target==='admin-dashboard')return adminDashboard();if(target==='artist-dashboard')return artistDashboard();return discoverPage();}
 function music() {
   state.tint = '#1d3a2f';
   shell(`${searchFieldHtml('page-search','page-search mobile-search','What do you want to play?','Search SoundWave')}${recentSearchesHtml()}<div id="search-results">${searchResultsHtml()}</div>`, 'Search', '');
@@ -2767,7 +2814,8 @@ async function boot(){
      await ensureOAuthProfile(state.user);
      await loadData();await loadCompetitionData();await restoreLastSongPlayer();setupRealtime();bindCrossDeviceRefresh();await acceptPendingPlaylistInvite();
      const matched=applyHash(location.hash),firstRoleEntry=!sessionStorage.getItem('soundwave-role-entry');
-     if(!matched||(firstRoleEntry&&/^#\/(?:discover|home)?$/.test(location.hash||'#/discover')))state.page=defaultLanding();
+     const roleLanding=defaultLanding(),listenerLanding=roleLanding==='discover';
+     if(!matched||(firstRoleEntry&&/^#\/(?:discover|home)?$/.test(location.hash||'#/discover'))||(!listenerLanding&&state.page==='discover'))state.page=roleLanding;
      sessionStorage.setItem('soundwave-role-entry','1');
    }
    await routeLoad();
@@ -2887,7 +2935,7 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); state.installEvent = e; const b = document.getElementById('install-app'); if (b) b.hidden = false; });
 window.addEventListener('appinstalled', () => { state.installEvent = null; const b = document.getElementById('install-app'); if (b) b.hidden = true; });
 initMediaKeys();
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=46').catch(()=>{});
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=47').catch(()=>{});
 boot();
 
 /* Card hover effects: cursor spotlight + subtle 3D tilt (works for cards rendered later too) */
