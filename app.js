@@ -225,6 +225,7 @@ function catalogAlbums() {
     if (!m.has(a.album_id)) m.set(a.album_id, { album_id: a.album_id, title: a.album_title, description: a.description, release_type: a.release_type || 'Album', cover_path: a.cover_path, release_date: a.release_date, is_active: a.is_active !== false, artist: a.artist, songs: [] });
     m.get(a.album_id).songs.push(s);
   }
+  for(const [albumId,al] of m){if(!al.songs.some(s=>s.is_active!==false)||al.is_active===false)m.delete(albumId);}
   for (const al of m.values()) al.songs.sort((x, y) => (x.track_number ?? 1e9) - (y.track_number ?? 1e9) || x.song_id - y.song_id);
   _albumCache = { src: state.songs, val: [...m.values()] };
   return _albumCache.val;
@@ -398,6 +399,7 @@ function albumTile(a) {
   const q = ids(a.songs).join(',');
   return `<article class="release-tile card-link" tabindex="0" role="link" data-open-album="${a.album_id}" data-queue="${q}"><span class="release-art">${albumArt({ song_id: a.album_id, album: a }, 'large')}<button type="button" class="hover-play" data-play="${a.songs[0].song_id}" aria-label="Play ${esc(a.title)}">${icon('play')}</button></span><strong>${esc(a.title)}</strong><small>${yearOf(a.release_date) ? yearOf(a.release_date) + ' · ' : ''}${esc(a.artist?.artist_name || 'SoundWave')}</small></article>`;
 }
+function publiclyReleasedArtist(a){return isOwnArtist(a)||songsByArtist(a.artist_id).some(s=>s.is_active!==false && s.album?.is_active!==false);}
 function artistCard(a, i = 0, o = {}) {
   const songs = songsByArtist(a.artist_id);
   const ownVerified = isOwnArtist(a) && state.socialRpc?.mine;
@@ -411,7 +413,25 @@ function showCard(p, i = 0) {
   const art=p.cover_path&&state.coverUrls[p.cover_path]?`<img class="cover-img" src="${esc(state.coverUrls[p.cover_path])}" alt="${esc(p.show_title)}">`:icon('mic');
   return `<button type="button" class="cover-card" data-open-show="${p.show_id}"><span class="cover-art" style="background:${grad(i)}">${art}</span><strong>${esc(p.show_title)}</strong><small>${esc(p.category || 'Podcast')}</small></button>`;
 }
-function toast(msg,error=false){ const el=document.createElement('div'); el.className=`toast ${error?'error':''}`; el.setAttribute('role',error?'alert':'status'); el.innerHTML=`<span class=\"toast-mark\">${error?'!':'✓'}</span><span>${esc(msg)}</span>`;document.body.append(el);requestAnimationFrame(()=>el.classList.add('show'));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),450)},5000); }
+// F-11: limited, deduplicated and dismissible notification stack.
+const toastTimers=new WeakMap();
+function toast(msg,error=false){
+ let stack=document.getElementById('soundwave-toasts');
+ if(!stack){stack=document.createElement('div');stack.id='soundwave-toasts';stack.className='toast-stack';stack.setAttribute('aria-live','polite');document.body.append(stack);}
+ const key=(error?'error:':'info:')+String(msg);
+ let el=[...stack.children].find(x=>x.dataset.toastKey===key);
+ if(!el){el=document.createElement('div');el.className=`toast ${error?'error':''}`;el.dataset.toastKey=key;el.setAttribute('role',error?'alert':'status');
+ const mark=document.createElement('span');mark.className='toast-mark';mark.textContent=error?'!':'✓';
+ const message=document.createElement('span');message.textContent=String(msg);
+ const close=document.createElement('button');close.type='button';close.className='toast-close';close.textContent='×';close.setAttribute('aria-label','Dismiss notification');close.onclick=()=>{clearTimeout(toastTimers.get(el));el.remove();};
+ el.append(mark,message,close);stack.append(el);
+ }else{el.classList.remove('toast-pulse');void el.offsetWidth;el.classList.add('toast-pulse');}
+ while(stack.children.length>3)stack.firstElementChild.remove();
+ const dismiss=()=>{clearTimeout(toastTimers.get(el));toastTimers.set(el,setTimeout(()=>el.remove(),error?5000:2400));};
+ el.onmouseenter=()=>clearTimeout(toastTimers.get(el));el.onmouseleave=()=>{clearTimeout(toastTimers.get(el));toastTimers.set(el,setTimeout(()=>el.remove(),1200));};
+ dismiss();requestAnimationFrame(()=>el.classList.add('show'));
+}
+
 function authErrorMessage(e){
   const code=String(e?.code||e?.error_code||'').toLowerCase();
   const msg=String(e?.message||e?.error_description||e||'');
@@ -545,6 +565,63 @@ document.addEventListener('click', (event) => {
   event.stopImmediatePropagation();
   openAdminDashboardSection(button.dataset.adminDashboardAction);
 }, true);
+
+// F-07: search accessory controls work after rerenders and at the search route.
+document.addEventListener('input',event=>{
+ if(!event.target.matches?.('#global-search,#page-search'))return;
+ const wrap=event.target.closest('.global-search,.page-search');if(!wrap)return;
+ const hasValue=Boolean(event.target.value.trim());wrap.dataset.hasValue=String(hasValue);
+ const clear=wrap.querySelector('.search-clear'),browse=wrap.querySelector('.search-browse'),divider=wrap.querySelector('.search-divider');
+ if(clear)clear.hidden=!hasValue;if(browse)browse.hidden=hasValue;if(divider)divider.hidden=hasValue;
+});
+document.addEventListener('click',event=>{
+ const browse=event.target.closest?.('.search-browse');if(!browse)return;
+ if(state.page!=='music')return;
+ event.preventDefault();event.stopImmediatePropagation();
+ state.searchQuery='';state.searchGenre=null;state.searchTab='all';
+ document.querySelectorAll('#global-search,#page-search').forEach(input=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));});
+ renderSearchResults();
+},true);
+
+
+// FR-01: karaoke surface lives in the main dashboard region, not the right rail.
+Object.assign(state,{karaokeMode:false,mobileLyricsOpen:false});
+async function ensureLyricsLoaded(songId){
+ if(!songId)return '';
+ if(Object.prototype.hasOwnProperty.call(state.lyricsCache,songId))return state.lyricsCache[songId];
+ const result=await db.from('song_lyrics').select('*').eq('song_id',songId).maybeSingle();
+ if(result.error){console.warn('Lyrics could not be loaded',result.error);return '';}
+ const lyrics=String(result.data?.lyrics_text??result.data?.lyrics??result.data?.content??'');
+ state.lyricsCache[songId]=lyrics;return lyrics;
+}
+async function syncKaraokePanel(){
+ const main=document.getElementById('main-content');if(!main)return;
+ main.querySelector('.karaoke-panel')?.remove();
+ document.body.classList.toggle('karaoke-mode',Boolean(state.karaokeMode && state.player?.kind==='song'));
+ if(!document.body.classList.contains('karaoke-mode'))return;
+ const panel=document.createElement('section');panel.className='karaoke-panel';panel.setAttribute('aria-label','Karaoke lyrics');
+ const heading=document.createElement('h2');heading.textContent=state.player.title||'Karaoke';
+ const lines=document.createElement('div');lines.className='karaoke-lines';lines.textContent='Loading lyrics…';panel.append(heading,lines);main.append(panel);
+ const songId=state.player.id;
+ const lyrics=await ensureLyricsLoaded(songId);
+ if(panel.isConnected && state.player?.id===songId)lines.textContent=lyrics||'No lyrics available for this song.';
+}
+document.addEventListener('click',e=>{if(!e.target.closest?.('[data-karaoke-toggle]'))return;e.preventDefault();state.karaokeMode=!state.karaokeMode;document.querySelectorAll('[data-karaoke-toggle]').forEach(b=>b.setAttribute('aria-pressed',String(state.karaokeMode)));void syncKaraokePanel();});
+
+
+// F-09: independent lyrics overlay does not rebuild audio (avoids interrupted playback).
+document.addEventListener('click',async e=>{
+ const btn=e.target.closest?.('#mobile-lyrics-toggle');if(!btn)return;
+ e.preventDefault();state.mobileLyricsOpen=!state.mobileLyricsOpen;
+ const panel=document.getElementById('mobile-now-lyrics');if(!panel)return;
+ panel.hidden=!state.mobileLyricsOpen;btn.setAttribute('aria-pressed',String(state.mobileLyricsOpen));
+ document.getElementById('mobile-now-playing')?.classList.toggle('show-lyrics',state.mobileLyricsOpen);
+ if(state.mobileLyricsOpen&&state.player?.kind==='song'){
+  const id=state.player.id,lines=panel.querySelector('#mobile-now-lyrics-content');
+  const lyrics=await ensureLyricsLoaded(id);if(lines&&state.player?.id===id)lines.textContent=lyrics||'Lyrics are not available for this song.';
+ }
+});
+
 function goBack() { window.history.back(); }
 function goForward() { window.history.forward(); }
 function albumArt(song, size='tile'){
@@ -731,6 +808,7 @@ function playerBarHtml(d) {
   const thumb = idle ? icon('music') : podcast ? icon('mic') : albumArt(song, 'tiny');
   const fullArt = podcast ? `<span class="mobile-now-placeholder">${icon('mic')}</span>` : albumArt(song, 'large');
   const contextLabel = podcast ? 'Playing podcast' : 'Now playing';
+  const mobileLyricsBtn= !idle&&!podcast ? `<button type="button" id="mobile-lyrics-toggle" class="mobile-now-icon" aria-pressed="${Boolean(state.mobileLyricsOpen)}" aria-label="View lyrics" title="Lyrics">${icon('music')}</button>` : '';
   return `<div class="custom-playbar ${idle ? 'idle-playbar' : ''}">
  <div class="player-song"><div class="mobile-now-open" id="mobile-now-open" role="button" tabindex="0" aria-label="Open now playing details"><span class="player-thumb ${idle ? 'idle-thumb' : ''}">${thumb}</span><span class="player-song-text"><strong>${esc(d?.title || 'SoundWave')}</strong><small>${idle ? 'Choose something to play' : artistId ? `<a href="#/artist-detail/${artistId}" data-open-artist="${artistId}">${esc(d.artist)}</a>` : esc(d.artist)}</small></span></div>${song ? heartBtn(song.song_id, 'player-heart') : ''}</div>
  <div class="player-center"><div class="play-controls">
@@ -740,8 +818,8 @@ function playerBarHtml(d) {
   <button type="button" id="sw-next" class="icon-quiet" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}" title="${podcast ? 'Forward 15 seconds' : 'Next'}" ${dis}>${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button>
   ${podcast ? '' : `<button type="button" id="sw-repeat" class="icon-quiet mode ${prefs.repeat !== 'off' ? 'active' : ''}" data-mode="${prefs.repeat}" aria-label="Repeat: ${prefs.repeat}" title="Repeat" ${dis}>${icon(prefs.repeat === 'one' ? 'repeat1' : 'repeat')}</button>`}
  </div><div class="player-timeline"><span id="sw-elapsed">0:00</span><input id="sw-seek" type="range" min="0" max="1000" value="0" style="--pct:0%" aria-label="Seek position" ${dis}><span id="sw-total">${nice(d?.duration || 0)}</span></div></div>
- <div class="player-right"><button type="button" id="sw-queue" class="icon-quiet ${state.railTab === 'queue' && !prefs.railHidden ? 'active' : ''}" aria-label="Queue" title="Queue">${icon('queue')}</button><button type="button" id="sw-mute" class="icon-quiet" aria-label="Mute" title="Mute">${icon(vol === 0 ? 'mute' : 'volume')}</button><input id="sw-volume" type="range" min="0" max="100" value="${vol}" style="--pct:${vol}%" aria-label="Volume"><button type="button" id="sw-view" class="icon-quiet ${prefs.railHidden ? '' : 'active'}" aria-label="Now playing view" title="Now playing view">${icon('library')}</button></div>
- ${idle ? '' : `<audio id="sw-audio" preload="metadata" src="${esc(d.url)}"></audio><section class="mobile-now-playing" id="mobile-now-playing" aria-hidden="true"><div class="mobile-now-bg" aria-hidden="true"></div><div class="mobile-now-head"><button type="button" id="mobile-now-close" class="mobile-now-icon" aria-label="Close now playing">${icon('back')}</button><strong>${contextLabel}</strong><button type="button" class="mobile-now-icon" id="mobile-now-more" aria-label="Open queue">${icon('queue')}</button></div><div class="mobile-now-art">${fullArt}</div><div class="mobile-now-copy"><div><h2>${esc(d.title)}</h2><p>${esc(d.artist)}</p></div>${song ? heartBtn(song.song_id, 'mobile-now-heart') : ''}</div><div class="mobile-now-progress"><input id="mobile-now-seek" type="range" min="0" max="1000" value="0" aria-label="Seek position"><div><span id="mobile-now-elapsed">0:00</span><span id="mobile-now-total">${nice(d.duration || 0)}</span></div></div><div class="mobile-now-controls"><button type="button" id="mobile-now-prev" aria-label="${podcast ? 'Back 15 seconds' : 'Previous song'}">${podcast ? '<span class="skip-15">−15</span>' : icon('prev')}</button><button type="button" id="mobile-now-toggle" class="mobile-now-play" aria-label="Pause">${icon('pause')}</button><button type="button" id="mobile-now-next" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}">${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button></div></section>`}</div>`;
+ <div class="player-right">${!idle&&!podcast?`<button type="button" class="icon-quiet" data-karaoke-toggle aria-label="Toggle karaoke lyrics" aria-pressed="${Boolean(state.karaokeMode)}" title="Karaoke lyrics">${icon('mic')}</button>`:''}<button type="button" id="sw-queue" class="icon-quiet ${state.railTab === 'queue' && !prefs.railHidden ? 'active' : ''}" aria-label="Queue" title="Queue">${icon('queue')}</button><button type="button" id="sw-mute" class="icon-quiet" aria-label="Mute" title="Mute">${icon(vol === 0 ? 'mute' : 'volume')}</button><input id="sw-volume" type="range" min="0" max="100" value="${vol}" style="--pct:${vol}%" aria-label="Volume"><button type="button" id="sw-view" class="icon-quiet ${prefs.railHidden ? '' : 'active'}" aria-label="Now playing view" title="Now playing view">${icon('library')}</button></div>
+ ${idle ? '' : `<audio id="sw-audio" preload="metadata" src="${esc(d.url)}"></audio><section class="mobile-now-playing" id="mobile-now-playing" aria-hidden="true"><div class="mobile-now-bg" aria-hidden="true"></div><section class="mobile-now-lyrics" id="mobile-now-lyrics" hidden><h3>Lyrics</h3><div id="mobile-now-lyrics-content">Loading lyrics…</div></section><div class="mobile-now-head"><button type="button" id="mobile-now-close" class="mobile-now-icon" aria-label="Close now playing">${icon('back')}</button><strong>${contextLabel}</strong>${mobileLyricsBtn}<button type="button" class="mobile-now-icon" id="mobile-now-more" aria-label="Open queue">${icon('queue')}</button></div><div class="mobile-now-art">${fullArt}</div><div class="mobile-now-copy"><div><h2>${esc(d.title)}</h2><p>${esc(d.artist)}</p></div>${song ? heartBtn(song.song_id, 'mobile-now-heart') : ''}</div><div class="mobile-now-progress"><input id="mobile-now-seek" type="range" min="0" max="1000" value="0" aria-label="Seek position"><div><span id="mobile-now-elapsed">0:00</span><span id="mobile-now-total">${nice(d.duration || 0)}</span></div></div><div class="mobile-now-controls"><button type="button" id="mobile-now-prev" aria-label="${podcast ? 'Back 15 seconds' : 'Previous song'}">${podcast ? '<span class="skip-15">−15</span>' : icon('prev')}</button><button type="button" id="mobile-now-toggle" class="mobile-now-play" aria-label="Pause">${icon('pause')}</button><button type="button" id="mobile-now-next" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}">${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button></div></section>`}</div>`;
 }
 async function stopAudio() {
   const audio = document.getElementById('sw-audio');
@@ -752,7 +830,7 @@ async function stopAudio() {
     audio.pause();
     if (audio.src?.startsWith('blob:')) URL.revokeObjectURL(audio.src);
   }
-  state.player = null; state.playerToken++; document.body.classList.remove('mobile-player-open');
+  state.player = null; state.playerToken++; state.karaokeMode=false;document.body.classList.remove('karaoke-mode','mobile-player-open');
   document.title = 'SoundWave | Music for every moment';
   try { if ('mediaSession' in navigator) navigator.mediaSession.metadata = null; } catch {}
   const root = document.getElementById('soundwave-player');
@@ -922,6 +1000,7 @@ function bindPlayerBar(audio, details, token) {
 function markPlaying() {
   const p = state.player, audio = document.getElementById('sw-audio'), playing = !!(audio && !audio.paused);
   document.querySelectorAll('.track[data-song]').forEach((r) => {
+    if(r.closest('.history-tracks')){r.classList.remove('playing','paused');const b=r.querySelector('.t-play');if(b)b.innerHTML=icon('play');return;}
     const on = p?.kind === 'song' && Number(r.dataset.song) === Number(p.id);
     r.classList.toggle('playing', on); r.classList.toggle('paused', on && !playing);
     const b = r.querySelector('.t-play'); if (b) b.innerHTML = icon(on && playing ? 'pause' : 'play');
@@ -1572,12 +1651,12 @@ async function loadArtistPopularity(artistId){
   }
 }
 function artistDetail() {
-  const artist = state.artists.find((a) => Number(a.artist_id) === Number(state.selectedArtist));
+  const artist = state.artists.find((a) => Number(a.artist_id) === Number(state.selectedArtist) && (a.is_published !== false || isOwnArtist(a)));
   if (!artist) return artists();
   const popularity=state.artistPopularity?.[String(artist.artist_id)]||{};
   const popularityLoaded=Object.prototype.hasOwnProperty.call(state.artistPopularity||{},String(artist.artist_id));
   const releases = [...songsByArtist(artist.artist_id)].sort((a,b)=>(Number(popularity[b.song_id]||0)-Number(popularity[a.song_id]||0))||(Number(b.song_id)-Number(a.song_id)));
-  const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id));
+  const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id) && (a.is_published !== false || own));
   const own = isOwnArtist(artist), fc = followerText(artist.artist_id);
   const banner=artist.cover_path&&state.coverUrls[artist.cover_path];
   const bannerStyle=banner?`--artist-cover:url("${esc(banner)}");`:'';
@@ -2123,14 +2202,15 @@ function podcastStudioAnalytics(){
 }
 
 function podcastStudio(){
+ const studioRole=hasAdminAccess()?(hasArtistAccess()?'artist-admin':'admin'):'artist';
  const activeShows=state.myShows.filter(p=>p.is_active);
  const ownShowIds=new Set(state.myShows.map(p=>Number(p.show_id)));
  const ownEpisodes=state.episodes.filter(ep=>ownShowIds.has(Number(ep.show_id)));
  const activeEpisodes=ownEpisodes.filter(ep=>ep.is_active!==false).length;
  const metrics=podcastStudioAnalytics();
  const totalListens=metrics.total;
- const showCards=state.myShows.map((p,i)=>{const listens=metrics.topShows.find(x=>Number(x.id)===Number(p.show_id))?.value||0;const eps=ownEpisodes.filter(ep=>Number(ep.show_id)===Number(p.show_id)).length;return `<article class="podcast-studio-card"><div class="podcast-card-art-wrap"><div class="podcast-card-art" style="background:${grad(i)}">${p.cover_path&&state.coverUrls[p.cover_path]?`<img class="cover-img" src="${esc(state.coverUrls[p.cover_path])}" alt="${esc(p.show_title)}" loading="lazy">`:icon('mic')}</div><span class="podcast-card-state status-pill ${p.is_active?'active':'inactive'}">${p.is_active?'Active':'Inactive'}</span></div><div class="podcast-card-copy"><span class="podcast-card-category">${esc(p.category||'Podcast')}</span><strong class="podcast-card-title">${esc(p.show_title)}</strong><p>${esc(p.description||'No description yet. Add a short description so listeners know what your show is about.')}</p><div class="podcast-card-metrics"><span><b>${listens}</b> listens</span><span><b>${eps}</b> episodes</span></div></div><div class="card-actions podcast-card-actions"><button class="button secondary sm" data-studio-show="${p.show_id}" aria-label="Edit ${esc(p.show_title)}">${icon('settings')} <span>Edit show</span></button><button class="button secondary sm ${p.is_active?'danger-soft':''}" data-show-active="${p.show_id}" data-active="${p.is_active?'false':'true'}" aria-label="${p.is_active?'Deactivate':'Restore'} ${esc(p.show_title)}">${p.is_active?'Deactivate':'Restore'}</button></div></article>`}).join('');
- shell(`<section class="workspace-hero podcast-studio-hero"><div><span class="eyebrow">CREATOR WORKSPACE</span><h2>Podcast Studio</h2><p>Publish, manage and understand your podcast catalog with separate focused views.</p><div class="inline"><button class="button hero-cta" data-open-modal="create-show-dialog">${icon('plus')} Create show</button><button class="button secondary" data-open-modal="publish-episode-dialog" ${!activeShows.length?'disabled':''}>${icon('upload')} Publish episode</button></div></div><span class="hero-vinyl">${icon('mic')}</span></section>
+ const showCards=state.myShows.map((p,i)=>{const listens=metrics.topShows.find(x=>Number(x.id)===Number(p.show_id))?.value||0;const eps=ownEpisodes.filter(ep=>Number(ep.show_id)===Number(p.show_id)).length;return `<article class="podcast-studio-card">${eps===0?`<span class="status-pill draft">Draft · 0 episodes</span>`:''}<div class="podcast-card-art-wrap"><div class="podcast-card-art" style="background:${grad(i)}">${p.cover_path&&state.coverUrls[p.cover_path]?`<img class="cover-img" src="${esc(state.coverUrls[p.cover_path])}" alt="${esc(p.show_title)}" loading="lazy">`:icon('mic')}</div><span class="podcast-card-state status-pill ${p.is_active?'active':'inactive'}">${p.is_active?'Active':'Inactive'}</span></div><div class="podcast-card-copy"><span class="podcast-card-category">${esc(p.category||'Podcast')}</span><strong class="podcast-card-title">${esc(p.show_title)}</strong><p>${esc(p.description||'No description yet. Add a short description so listeners know what your show is about.')}</p><div class="podcast-card-metrics"><span><b>${listens}</b> listens</span><span><b>${eps}</b> episodes</span></div></div><div class="card-actions podcast-card-actions"><button class="button secondary sm" data-studio-show="${p.show_id}" aria-label="Edit ${esc(p.show_title)}">${icon('settings')} <span>Edit show</span></button><button class="button secondary sm ${p.is_active?'danger-soft':''}" data-show-active="${p.show_id}" data-active="${p.is_active?'false':'true'}" aria-label="${p.is_active?'Deactivate':'Restore'} ${esc(p.show_title)}">${p.is_active?'Deactivate':'Restore'}</button></div></article>`}).join('');
+ shell(`<section class="workspace-hero podcast-studio-hero podcast-studio-hero--${studioRole}" data-studio-role="${studioRole}"><div><span class="eyebrow">${studioRole==='admin'?'MODERATOR WORKSPACE':studioRole==='artist-admin'?'CREATOR + MODERATOR WORKSPACE':'CREATOR WORKSPACE'}</span><h2>Podcast Studio</h2><p>${studioRole==='admin'?'Oversee podcast catalog status and performance.':'Publish, manage and understand your podcast catalog with separate focused views.'}</p><div class="inline"><button class="button hero-cta" data-open-modal="create-show-dialog">${icon('plus')} Create show</button><button class="button secondary" data-open-modal="publish-episode-dialog" ${!activeShows.length?'disabled':''}>${icon('upload')} Publish episode</button></div></div><span class="hero-vinyl">${icon('mic')}</span></section>
  <nav class="creator-view-tabs" aria-label="Podcast Studio views"><button class="${state.podcastStudioView==='overview'?'active':''}" data-podcast-studio-view-btn="overview">Overview</button><button class="${state.podcastStudioView==='analytics'?'active':''}" data-podcast-studio-view-btn="analytics">Analytics</button><button class="${state.podcastStudioView==='shows'?'active':''}" data-podcast-studio-view-btn="shows">Shows</button><button class="${state.podcastStudioView==='publish'?'active':''}" data-podcast-studio-view-btn="publish">Publish</button></nav>
  <section class="creator-view-block" data-podcast-studio-view="overview" ${state.podcastStudioView!=='overview'?'hidden':''}><section class="studio-stat-strip four podcast-kpis"><button type="button" data-podcast-open="shows"><small>Shows</small><strong data-count="${state.myShows.length}">${state.myShows.length}</strong><span>Your podcast catalog</span></button><button type="button" data-podcast-open="shows"><small>Active episodes</small><strong data-count="${activeEpisodes}">${activeEpisodes}</strong><span>Currently available</span></button><button type="button" data-podcast-open="analytics"><small>Qualified listens</small><strong data-count="${totalListens}">${totalListens}</strong><span>30s+ or completed</span></button><button type="button" data-podcast-open="analytics"><small>Unique listeners</small><strong data-count="${metrics.unique}">${metrics.unique}</strong><span>${metrics.minutes} minutes listened</span></button></section><div class="creator-summary-grid"><article><span class="eyebrow">PUBLISH</span><h3>Keep your show active</h3><p>Create a show or publish a new episode from one dedicated workspace.</p><button class="button secondary" data-podcast-open="publish">Open publishing</button></article><article><span class="eyebrow">PERFORMANCE</span><h3>${metrics.total} qualified listens</h3><p>See listening trend, top episodes and completion rate without catalog controls in the way.</p><button class="button secondary" data-podcast-open="analytics">View analytics</button></article><article><span class="eyebrow">CATALOG</span><h3>${state.myShows.length} shows</h3><p>Edit show information and availability from the Shows view.</p><button class="button secondary" data-podcast-open="shows">Manage shows</button></article></div></section>
  <section class="creator-view-block" data-podcast-studio-view="analytics" ${state.podcastStudioView!=='analytics'?'hidden':''}><section class="analytics-suite podcast-analytics-suite"><div class="section-heading"><div><span class="eyebrow">PERFORMANCE</span><h2>Podcast analytics</h2></div><span class="muted small">Last 30 days · qualified listens</span></div><div class="chart-grid"><article class="chart-card chart-wide"><div class="chart-head"><div><small>Listen trend</small><strong>${metrics.total}</strong></div><span>30 days</span></div>${sparkline(metrics.days)}</article><article class="chart-card"><div class="chart-head"><div><small>Top episodes</small><strong class="chart-title">${esc(metrics.topEpisodes[0]?.name||'No listens yet')}</strong></div><span>${metrics.topEpisodes[0]?.value||0} plays</span></div>${chartBars(metrics.topEpisodes)}</article><article class="chart-card"><div class="chart-head"><div><small>Listens by show</small><strong>${metrics.topShows.length}</strong></div><span>shows</span></div>${chartBars(metrics.topShows)}</article><article class="chart-card podcast-completion-card"><div class="chart-head"><div><small>Completion rate</small><strong>${metrics.completionRate}%</strong></div><span>${metrics.unique} listeners</span></div><div class="metric-ring" style="--metric:${metrics.completionRate}"><span>${metrics.completionRate}%</span><small>completed</small></div></article></div></section></section>
@@ -2226,7 +2306,7 @@ async function refreshHistory(force = false) {
 }
 function historyTable(rows) {
   const q = [...new Set(rows.map((x) => x.s.song_id))].join(',');
-  return `<div class="tracks" role="table"><div class="tracks-head" role="row"><span class="t-num">#</span><span>Title</span><span class="t-album">Played</span><span class="t-like"></span><span class="t-time" title="Duration">${icon('clock')}</span><span class="t-more"></span></div>${rows.map(({ r, s }, i) => trackRow(s, i, q, { showAlbum: true, histId: r.stream_id, albumHtml: `<span title="${esc(new Date(r.stream_date).toLocaleString())}">${esc(agoText(r.stream_date))}${r.duration_played_seconds ? ` · ${nice(r.duration_played_seconds)} listened` : ''}</span>` })).join('')}</div>`;
+  return `<div class="tracks history-tracks" role="table"><div class="tracks-head" role="row"><span class="t-num">#</span><span>Title</span><span class="t-album">Played</span><span class="t-like"></span><span class="t-time" title="Duration">${icon('clock')}</span><span class="t-more"></span></div>${rows.map(({ r, s }, i) => trackRow(s, i, q, { showAlbum: true, histId: r.stream_id, albumHtml: `<span title="${esc(new Date(r.stream_date).toLocaleString())}">${esc(agoText(r.stream_date))}${r.duration_played_seconds ? ` · ${nice(r.duration_played_seconds)} listened` : ''}</span>` })).join('')}</div>`;
 }
 function history() {
   const rows = state.history.map((r) => ({ r, s: songById(r.song_id) })).filter((x) => x.s);
