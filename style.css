@@ -4318,3 +4318,64 @@ body[data-page="admin"] [data-admin-row][hidden]{display:none!important}
 .artist-cover-preview img{width:100%;height:100%;object-fit:cover;display:block}
 @media(max-width:1050px){body[data-page="admin"] .moderation-commandbar{grid-template-columns:minmax(0,1fr) minmax(135px,175px)}body[data-page="admin"] .moderation-visible-count{text-align:left}}
 @media(max-width:560px){body[data-page="admin"] .moderation-commandbar{grid-template-columns:minmax(0,1fr)}body[data-page="admin"] .moderation-commandbar>*,body[data-page="admin"] .moderation-commandbar button,body[data-page="admin"] .moderation-commandbar select{width:100%}.artist-cover-preview{width:100%;height:92px}}
+
+/* v47 artist banner and sidebar polish: no abrupt arrow rotation. */
+body[data-page="artist-detail"] .artist-profile-hero {
+  background-color:var(--artist-accent, #273a34)!important;
+  background-image:linear-gradient(0deg,rgba(9,13,14,.84),rgba(9,13,14,.14) 75%),var(--artist-cover,linear-gradient(130deg,var(--artist-accent),#15211d))!important;
+  background-size:cover!important;
+  background-position:center center!important;
+}
+body[data-page="artist-detail"] .artist-section .tracks-head {
+  background:color-mix(in srgb,var(--artist-accent,#34433c) 12%,#171b1a 88%)!important;
+  border:0!important;
+  border-bottom:1px solid rgba(255,255,255,.12)!important;
+  border-radius:3px!important;
+  box-shadow:none!important;
+}
+.library-filter-arrow,.library-filter-arrow.at-end { transform:none!important; transition:background-color .16s ease,border-color .16s ease,opacity .16s ease!important; }
+.library-filter-arrow svg{transition:none!important}
+.library-filter-arrow.at-end svg{transform:rotate(180deg)}
+.library-filter-arrow:hover:not(:disabled){background:#303b35;border-color:#ffffff35}
+.library-filter-arrow:disabled{opacity:.38!important;cursor:default;box-shadow:none}
+@media(prefers-reduced-motion:reduce){.library-filter-arrow,.library-filter-arrow svg{transition:none!important}}
+
+/* v47 artist compact header edge-to-edge, including wide monitors. */
+body[data-page="artist-detail"] .dashboard-content{
+  max-width:none!important;
+  width:100%!important;
+  padding-inline:0!important;
+  box-sizing:border-box!important;
+}
+body[data-page="artist-detail"] .page-body{
+  padding-inline:0!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+}
+body[data-page="artist-detail"] .artist-sticky-bar{
+  width:100%!important;
+  max-width:none!important;
+  margin-inline:0!important;
+  box-sizing:border-box!important;
+  border-radius:0!important;
+  left:0!important;
+  right:0!important;
+}
+body[data-page="artist-detail"] .artist-profile-hero{
+  width:100%!important;
+  margin-inline:0!important;
+  border-radius:0!important;
+}
+body[data-page="artist-detail"] .artist-primary-actions,
+body[data-page="artist-detail"] .artist-section,
+body[data-page="artist-detail"] .about-card{
+  margin-left:clamp(12px,2vw,28px)!important;
+  margin-right:clamp(12px,2vw,28px)!important;
+}
+/* Horizontal filter overflow arrow: show only when an actual chip is clipped. */
+.library-filter-row{scroll-snap-type:none!important;scroll-behavior:auto!important}
+.library-filter-arrow{transform:none!important;transition:background-color .15s ease,opacity .15s ease!important}
+.library-filter-arrow svg{transition:none!important;transform:none!important}
+.library-filter-arrow.at-end svg{transform:rotate(180deg)!important}
+.library-filter-arrow[hidden]{display:none!important}
+.library-filter-arrow:disabled{opacity:.3!important;pointer-events:none}
