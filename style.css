@@ -4297,3 +4297,10 @@ body[data-page="artist-detail"] .artist-section .tracks-head{background:#202a27!
 .artist-cover-settings{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:20px 24px;border-radius:16px;background:linear-gradient(115deg,#26332d,#18231f);border:1px solid #ffffff1b;margin:18px 0}
 .artist-cover-settings h3{font-size:19px;margin:6px 0}.artist-cover-settings p{color:#b0bcb4;font-size:13px;margin:0;max-width:530px}.artist-cover-settings label{cursor:pointer;white-space:nowrap}
 @media(max-width:700px){.artist-cover-settings{padding:16px}.artist-cover-settings label{width:100%;justify-content:center}}
+
+/* Artist cover upload feedback and explicit browser file picker. */
+.artist-cover-controls{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:min(100%,230px)}
+.artist-cover-controls .button{width:100%;justify-content:center}
+.artist-cover-controls small{color:#bdc9c0;overflow-wrap:anywhere;max-width:360px}
+.artist-cover-controls small.upload-error{color:#ffaaa9}
+.artist-cover-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;clip-path:inset(50%);pointer-events:none}
