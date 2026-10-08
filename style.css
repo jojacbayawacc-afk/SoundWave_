@@ -4257,3 +4257,43 @@ body[data-page="artist-detail"] .artist-section{scroll-margin-top:84px}
 @media(max-width:700px){.admin-view-tabs{top:0;padding:8px 6px}.admin-tabbar{top:56px}.admin-overview,.admin-summary-grid{grid-template-columns:1fr 1fr}.moderation-commandbar{align-items:stretch}.moderation-commandbar>button,.moderation-commandbar>select{flex:1 1 auto}.upload-wizard-dialog .dialog-actions>*{flex:1 1 120px}body[data-page="artist-detail"] .artist-sticky-bar{min-height:62px}}
 @media(max-width:400px){.admin-overview,.admin-summary-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.library-filter-row{scroll-behavior:auto!important} .admin-view-tabs button{transition:none}}
+
+/* v47.2 — profile-based immersive artist header and readable track header */
+body[data-page="artist-detail"] .page-body{min-width:0}
+body[data-page="artist-detail"] .artist-profile-hero{width:100%!important;max-width:none!important;box-sizing:border-box;min-height:clamp(260px,32vw,365px)!important;border-radius:0!important;margin:0 0 22px!important;padding:clamp(26px,5vw,64px)!important;background:linear-gradient(180deg,color-mix(in srgb,var(--artist-accent) 93%,#111 7%) 0%,color-mix(in srgb,var(--artist-accent) 62%,#111 38%) 66%,#15211d 100%)!important;display:flex;align-items:flex-end;flex-direction:row;gap:22px}
+body[data-page="artist-detail"] .artist-profile-hero h1{font-size:clamp(42px,6vw,78px);line-height:1.02}
+body[data-page="artist-detail"] .artist-sticky-bar{width:100%!important;max-width:none!important;margin:0 0 -70px!important;top:0!important;left:0!important;border:0!important;border-radius:0!important;padding:12px 22px!important;min-height:70px!important;background:linear-gradient(110deg,var(--artist-accent),color-mix(in srgb,var(--artist-accent) 75%,#111))!important;box-shadow:0 7px 24px #0004!important;box-sizing:border-box}
+body[data-page="artist-detail"] .artist-section .tracks-head{background:color-mix(in srgb,var(--tint) 28%,#1b2421 72%)!important;border:1px solid #ffffff1c;border-radius:7px;color:#d2dad5}
+body[data-page="artist-detail"] .artist-section .tracks-head .t-extra{color:#b7cabe}
+.library-filter-arrow.no-overflow{opacity:.75}
+.library-filter-arrow{display:grid!important;visibility:visible!important}
+.library-filter-arrow[hidden]{display:grid!important}
+.library-filter-shell{grid-template-columns:minmax(0,1fr) 36px!important}
+.admin-overview button,.admin-view-tabs button,.admin-summary-card button{cursor:pointer;pointer-events:auto}
+.admin-view-tabs{z-index:12}
+/* Podcast listening rail */
+.podcast-rail-feature{position:relative;overflow:hidden;border:1px solid rgba(165,153,255,.23);border-radius:20px;padding:18px;background:linear-gradient(145deg,#343056,#23233e 55%,#111d1c);box-shadow:0 14px 36px #0004}
+.podcast-rail-art{height:190px;border-radius:15px;background:radial-gradient(circle at 30% 20%,#826bcd,#443b76 50%,#242946);display:grid;place-items:center;margin-bottom:18px;position:relative;overflow:hidden}
+.podcast-rail-art>svg{height:72px;width:72px;color:#eee6ff;z-index:1;filter:drop-shadow(0 5px 10px #0004)}
+.podcast-rail-pulse{position:absolute;width:155px;height:155px;border-radius:50%;border:1px solid #ffffff39;box-shadow:0 0 0 26px #ffffff0c,0 0 0 54px #ffffff09}
+.podcast-rail-kicker{font-size:10px;letter-spacing:1.5px;font-weight:850;color:#c6b7ff}
+.podcast-rail-feature h3{font-size:clamp(19px,2vw,24px);line-height:1.17;margin:9px 0 7px;overflow-wrap:anywhere}
+.podcast-rail-feature p{color:#b7b2cd;font-size:13px;margin:0}
+.podcast-rail-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:19px;padding-top:12px;border-top:1px solid #ffffff1b;color:#d7cfff;font-size:12px}
+.podcast-rail-meta span{display:inline-flex;align-items:center;gap:5px}
+.podcast-rail-meta svg{width:15px;height:15px}
+.podcast-rail-details{padding:18px;margin-top:14px;border-radius:17px;border:1px solid #ffffff15;background:#1a211f}
+.podcast-rail-details h4{font-size:17px;line-height:1.25;margin:12px 0 9px;overflow-wrap:anywhere}
+.podcast-rail-details p{font-size:13px;line-height:1.65;color:#abb9b1;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.podcast-rail-details .button{width:100%;margin-top:13px;display:flex;justify-content:center;gap:8px}
+.podcast-rail-tip{display:flex;align-items:flex-start;gap:9px;padding:14px 5px;color:#9daea4;font-size:12px;line-height:1.5}
+.podcast-rail-tip>svg{flex:none;width:18px;height:18px}
+@media(max-width:700px){body[data-page="artist-detail"] .artist-profile-hero{min-height:235px!important;padding:24px!important;gap:12px;flex-direction:column;align-items:flex-start}body[data-page="artist-detail"] .artist-sticky-bar{padding:8px 12px!important;min-height:60px!important}}
+
+/* Cover photo: own artist artwork takes precedence, and artist accent is the fallback. */
+body[data-page="artist-detail"] .artist-profile-hero{background-image:linear-gradient(0deg,rgba(8,13,15,.88),rgba(8,13,15,.12) 75%),var(--artist-cover,linear-gradient(130deg,var(--artist-accent),#15211d))!important;background-size:cover!important;background-position:center!important}
+body[data-page="artist-detail"] .artist-sticky-bar{background-image:linear-gradient(110deg,color-mix(in srgb,var(--artist-accent) 82%,#161b1b),color-mix(in srgb,var(--artist-accent) 62%,#101313))!important}
+body[data-page="artist-detail"] .artist-section .tracks-head{background:#202a27!important;border:1px solid #ffffff24!important}
+.artist-cover-settings{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:20px 24px;border-radius:16px;background:linear-gradient(115deg,#26332d,#18231f);border:1px solid #ffffff1b;margin:18px 0}
+.artist-cover-settings h3{font-size:19px;margin:6px 0}.artist-cover-settings p{color:#b0bcb4;font-size:13px;margin:0;max-width:530px}.artist-cover-settings label{cursor:pointer;white-space:nowrap}
+@media(max-width:700px){.artist-cover-settings{padding:16px}.artist-cover-settings label{width:100%;justify-content:center}}
