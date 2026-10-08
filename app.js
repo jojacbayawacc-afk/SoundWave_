@@ -2468,6 +2468,17 @@ function studio(){if(!hasArtistAccess())return discoverPage();
 function admin(){if(!hasAdminAccess())return discoverPage();
  const d=state.adminData||{};const users=d.users||[],artists=d.artists||[],songs=d.songs||state.songs||[],pods=d.podcasts||[];
  const activeUsers=users.filter(x=>x.is_active!==false).length;
+ // These values are used in the overview and Payments panel. They must exist
+ // before the admin template literal is evaluated, even when Payments is hidden.
+ const requests=Array.isArray(state.subscriptionRequests)?state.subscriptionRequests:[];
+ const pendingRequests=requests.filter(r=>['pending','awaiting_approval','awaiting_payment','submitted'].includes(String(r.status||r.payment_status||r.request_status||'').toLowerCase()));
+ const pending=pendingRequests.length;
+ const paymentCards=pendingRequests.map(r=>{
+   const name=r.display_name||r.user_name||r.email||r.user_id||'Subscription request';
+   const plan=r.plan_name||r.plan||r.subscription_plan||'Premium';
+   const submitted=r.created_at||r.requested_at||r.submitted_at||'';
+   return `<article class="admin-summary-card"><span class="eyebrow">PENDING REVIEW</span><h3>${esc(name)}</h3><p>${esc(plan)}${submitted?' · '+esc(String(submitted).slice(0,10)):''}</p></article>`;
+ }).join('');
  const cellStatus=(active)=>`<span class="status-pill ${active===false?'inactive':'active'}">${active===false?'Inactive':'Active'}</span>`;
  const empty=(iconText,title,msg)=>`<div class="empty admin-empty"><span>${iconText}</span><h3>${title}</h3><p>${msg}</p></div>`;
  const accountRows=users.map(u=>{const isAdmin=Boolean(u.is_admin)||String(u.account_type||'').toLowerCase()==='admin'||state.adminUserIds.includes(String(u.user_id));return `<tr data-admin-row data-search="${esc(`${u.display_name||'User'} ${u.account_type||'Listener'} ${u.user_id||''}`.toLowerCase())}" data-sort-name="${esc((u.display_name||'User').toLowerCase())}" data-sort-status="${u.is_active===false?'inactive':'active'}" data-priority="${u.is_active===false?'true':'false'}"><td data-label="Account"><div class="entity-cell"><span class="member-avatar">${esc((u.display_name||'U')[0].toUpperCase())}</span><span><strong>${esc(u.display_name||'User')}</strong>${isAdmin?'<small class="admin-role-note">Administrator</small>':''}</span></div></td><td data-label="Type">${esc(u.account_type||'Listener')}</td><td data-label="Joined">${esc(String(u.created_at||u.date_created||'—').slice(0,10))}</td><td data-label="Status">${cellStatus(u.is_active)}</td><td data-label="Actions"><div class="admin-row-actions">${isAdmin?`<span class="status-pill admin-access">Admin access</span>`:`<button class="button admin-promote sm" data-promote-admin="${esc(u.user_id)}" data-promote-name="${esc(u.display_name||'User')}">${icon('shield')} Promote to admin</button>`}<button class="button secondary sm" data-entity="users" data-name="${esc(u.display_name||'User')}" data-id="${esc(u.user_id)}" data-active="${u.is_active===false?'true':'false'}">${u.is_active===false?'Restore':'Deactivate'}</button></div></td></tr>`;}).join('');
