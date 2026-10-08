@@ -188,6 +188,7 @@ async function routeLoad() {
   } else if (state.page === 'artist-detail' && state.selectedArtist) {
     await loadArtistPopularity(state.selectedArtist);
     render();
+    void refreshViewedArtistCover(state.selectedArtist);
   } else if (state.page === 'podcast-studio') {
     await refreshPodcastStudioMetrics();
     render();
@@ -459,11 +460,43 @@ function hasArtistAccess(){return state.profile?.account_type === 'Artist' && Bo
 function hasAdminAccess(){return state.admin === true;}
 function primaryDashboard(){return hasAdminAccess()?'admin-dashboard':hasArtistAccess()?'artist-dashboard':'discover';}
 function defaultLanding(){return hasAdminAccess()?'admin-dashboard':hasArtistAccess()?'artist-dashboard':'discover';}
+// Refresh the public artist record when opening a profile. The browse catalog
+// can be older than a newly uploaded artist banner (including across accounts).
+let artistCoverRequestSequence = 0;
+async function refreshViewedArtistCover(artistId) {
+  if (!db || !artistId) return;
+  const sequence = ++artistCoverRequestSequence;
+  const response = await db.from('artist').select('artist_id,cover_path').eq('artist_id', Number(artistId)).eq('is_active', true).maybeSingle();
+  if (response.error) {
+    console.warn('Artist cover refresh failed:', response.error);
+    return;
+  }
+  if (!response.data || sequence !== artistCoverRequestSequence) return;
+  const artist = state.artists.find(item => Number(item.artist_id) === Number(artistId));
+  if (!artist) return;
+  const newPath = response.data.cover_path || null;
+  const changed = artist.cover_path !== newPath;
+  artist.cover_path = newPath;
+  if (newPath && (!state.coverUrls[newPath] || changed)) {
+    const url = await resolveCoverUrl(newPath);
+    if (url) state.coverUrls[newPath] = url;
+  }
+  if (sequence !== artistCoverRequestSequence || state.page !== 'artist-detail' || Number(state.selectedArtist) !== Number(artistId)) return;
+  const banner = document.getElementById('artist-profile-hero');
+  const sticky = document.getElementById('artist-sticky-bar');
+  const url = newPath && state.coverUrls[newPath];
+  for (const node of [banner, sticky]) {
+    if (!node) continue;
+    if (url) node.style.setProperty('--artist-cover', `url("${url.replaceAll('"', '%22')}")`);
+    else node.style.removeProperty('--artist-cover');
+  }
+}
 function navigate(page, extras = {}) {
   if (!pageAllowed(page)) return toast('This page is not available for your account.', true);
   if (page === 'playlists' && !('selectedPlaylist' in extras)) state.selectedPlaylist = null;
   state.page = page; Object.assign(state, extras);
   render();
+  if (page === 'artist-detail') void refreshViewedArtistCover(state.selectedArtist);
   const main = document.getElementById('main-content'); if (main) main.scrollTop = 0;
   if (page === 'admin' || page === 'admin-dashboard') scheduleStreamMetricsRefresh();
   if (page === 'history') void refreshHistory(true);
@@ -597,20 +630,45 @@ function bindShared() {
   bindContent(document);
   document.querySelectorAll('[data-create-playlist]').forEach((b) => b.onclick = () => action(quickCreatePlaylist));
   const libraryFilters=$('#library-filters'),libraryFilterArrow=$('#library-filter-arrow');
-  if(libraryFilters&&libraryFilterArrow){
-    const syncLibraryFilterArrow=()=>{
+  if(libraryFilters && libraryFilterArrow){
+    // The arrow reveals clipped chips. It never selects or changes a filter.
+    const pills=()=>[...libraryFilters.querySelectorAll('.filter-pill')];
+    const updateArrow=()=>{
       const max=Math.max(0,libraryFilters.scrollWidth-libraryFilters.clientWidth);
-      libraryFilterArrow.hidden=false;libraryFilterArrow.classList.toggle('no-overflow',max<4);
-      libraryFilterArrow.classList.toggle('at-end',libraryFilters.scrollLeft>=max-4);
-      libraryFilterArrow.setAttribute('aria-label',libraryFilters.scrollLeft>=max-4?'Show previous library filters':'Show more library filters');
+      const atEnd=libraryFilters.scrollLeft>=max-3;
+      libraryFilterArrow.hidden=max<3;
+      libraryFilterArrow.disabled=max<3;
+      libraryFilterArrow.classList.toggle('at-end',atEnd);
+      libraryFilterArrow.setAttribute('aria-label',atEnd?'Reveal hidden filters on the left':'Reveal hidden filters on the right');
+      libraryFilterArrow.title=atEnd?'Reveal previous hidden filters':'Reveal next hidden filters';
     };
-    libraryFilterArrow.onclick=()=>{
-      const max=Math.max(0,libraryFilters.scrollWidth-libraryFilters.clientWidth),atEnd=libraryFilters.scrollLeft>=max-4;if(max<4){libraryFilters.querySelector('[data-lib-filter]:not(.active)')?.click();return;}
-      libraryFilters.scrollTo({left:atEnd?0:Math.min(max,libraryFilters.scrollLeft+Math.max(120,libraryFilters.clientWidth*.72)),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
-      setTimeout(syncLibraryFilterArrow,260);
-    };
-    libraryFilters.addEventListener('scroll',syncLibraryFilterArrow,{passive:true});
-    requestAnimationFrame(syncLibraryFilterArrow);
+    libraryFilterArrow.addEventListener('click',(event)=>{
+      event.preventDefault();event.stopPropagation();
+      const max=Math.max(0,libraryFilters.scrollWidth-libraryFilters.clientWidth);
+      if(max<3)return;
+      const atEnd=libraryFilters.scrollLeft>=max-3;
+      const row=libraryFilters.getBoundingClientRect();
+      const items=pills();
+      const margin=5;
+      let delta=0;
+      if(atEnd){
+        const clipped=[...items].reverse().find(el=>el.getBoundingClientRect().left<row.left-margin);
+        if(clipped)delta=clipped.getBoundingClientRect().left-row.left-margin;
+        else delta=-Math.min(libraryFilters.clientWidth*.8,libraryFilters.scrollLeft);
+      }else{
+        const clipped=items.find(el=>el.getBoundingClientRect().right>row.right+margin);
+        if(clipped)delta=clipped.getBoundingClientRect().right-row.right+margin;
+        else delta=Math.min(libraryFilters.clientWidth*.8,max-libraryFilters.scrollLeft);
+      }
+      libraryFilters.scrollBy({left:delta,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+      window.setTimeout(updateArrow,300);
+    });
+    libraryFilters.addEventListener('scroll',updateArrow,{passive:true});
+    if(typeof ResizeObserver!=='undefined'){
+      const observer=new ResizeObserver(updateArrow);
+      observer.observe(libraryFilters);
+    }
+    requestAnimationFrame(updateArrow);
   }
   document.querySelectorAll('[data-open-modal]').forEach((b) => b.onclick = () => {const d=document.getElementById(b.dataset.openModal);if(!d)return;dialogOpeners.set(d,b);d.showModal();});
   document.querySelectorAll('[data-close-modal]').forEach((b) => b.onclick = () => b.closest('dialog')?.close());document.querySelectorAll('dialog').forEach(d=>{if(d.dataset.focusReturnBound)return;d.dataset.focusReturnBound='1';d.addEventListener('close',()=>dialogOpeners.get(d)?.focus());});
