@@ -4560,3 +4560,62 @@ body.karaoke-mode .workspace .main>.dashboard-content{display:none!important}
   .artist-analytics-grid{grid-auto-columns:minmax(212px,85vw)!important}
 }
 @media(prefers-reduced-motion:reduce){.admin-tabs,.admin-filters,.artist-analytics-grid{scroll-behavior:auto!important;scroll-snap-type:none!important}}
+
+
+/* ===== Mobile playlist repair: track content always has a visible column ===== */
+@media (max-width: 700px) {
+  body[data-page="playlists"] .tracks,
+  body[data-page="playlists"] .tracks.has-extra {width:100%;min-width:0;max-width:100%;overflow:hidden}
+  body[data-page="playlists"] .tracks .tracks-head{display:none!important}
+  body[data-page="playlists"] .tracks .track,
+  body[data-page="playlists"] .tracks.has-extra .track,
+  body[data-page="playlists"] .tracks.no-album.has-extra .track {
+    display:grid!important;
+    grid-template-columns:24px minmax(0,1fr) 36px 66px!important;
+    grid-template-areas:"num title like more"!important;
+    gap:7px!important;align-items:center!important;
+    padding:8px 6px!important;min-height:64px!important;
+    width:100%!important;min-width:0!important;max-width:100%!important;
+  }
+  body[data-page="playlists"] .tracks .t-num{grid-area:num!important;min-width:0!important}
+  body[data-page="playlists"] .tracks .t-title{
+    grid-area:title!important;display:flex!important;gap:9px!important;
+    min-width:0!important;width:100%!important;max-width:100%!important;
+    overflow:hidden!important;align-items:center!important;visibility:visible!important;opacity:1!important
+  }
+  body[data-page="playlists"] .tracks .t-title>.real-cover,
+  body[data-page="playlists"] .tracks .t-title>.placeholder-art,
+  body[data-page="playlists"] .tracks .t-title>img{
+    display:block!important;flex:0 0 44px!important;width:44px!important;height:44px!important;
+    min-width:44px!important;object-fit:cover!important
+  }
+  body[data-page="playlists"] .tracks .t-text{display:block!important;flex:1 1 0!important;min-width:0!important;width:0!important;overflow:hidden!important;visibility:visible!important;opacity:1!important}
+  body[data-page="playlists"] .tracks .t-text strong,
+  body[data-page="playlists"] .tracks .t-text small{
+    display:block!important;max-width:100%!important;min-width:0!important;
+    overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;visibility:visible!important
+  }
+  body[data-page="playlists"] .tracks .t-like{grid-area:like!important;min-width:0!important}
+  body[data-page="playlists"] .tracks .t-more{grid-area:more!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:2px!important;min-width:0!important}
+  body[data-page="playlists"] .tracks .t-more button{width:30px!important;min-width:0!important;padding:4px!important}
+  body[data-page="playlists"] .tracks .t-album,
+  body[data-page="playlists"] .tracks .t-extra,
+  body[data-page="playlists"] .tracks .t-time{display:none!important}
+  body[data-page="playlists"] .coll-actions{gap:8px!important;flex-wrap:wrap!important}
+  body[data-page="playlists"] .sw-more-options{right:0;left:auto;max-width:min(300px,calc(100vw - 40px));z-index:110}
+  .reference-edit-dialog{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;overscroll-behavior:contain}
+  .reference-edit-dialog .edit-surface-head{padding:16px!important}
+  .reference-edit-dialog .edit-surface-form{padding:12px 16px 0!important}
+  .reference-edit-dialog .edit-surface-grid{grid-template-columns:minmax(0,1fr)!important}
+  .reference-edit-dialog .edit-surface-actions{margin-inline:-16px!important;padding:12px 16px!important;gap:8px!important;flex-wrap:wrap!important}
+  .reference-edit-dialog .edit-surface-actions button{min-height:44px}
+  .sw-add-section,.sw-song-results{min-width:0;max-width:100%;overflow:hidden}
+  .sw-suggest-row{min-width:0;max-width:100%;grid-template-columns:40px minmax(0,1fr) auto!important}
+  .sw-suggest-row .sw-suggest-duration{display:none!important}
+}
+@media (max-width: 360px){
+  body[data-page="playlists"] .tracks .track,
+  body[data-page="playlists"] .tracks.has-extra .track{grid-template-columns:20px minmax(0,1fr) 30px 60px!important;gap:4px!important}
+  body[data-page="playlists"] .tracks .t-title>.real-cover,
+  body[data-page="playlists"] .tracks .t-title>.placeholder-art{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
+}
