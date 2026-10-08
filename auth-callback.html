@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://azqbzyxknfdwfuqevbrd.supabase.co; media-src 'self' blob: https://azqbzyxknfdwfuqevbrd.supabase.co; connect-src 'self' https://azqbzyxknfdwfuqevbrd.supabase.co wss://azqbzyxknfdwfuqevbrd.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="theme-color" content="#050806">
 <title>Signing in to SoundWave</title>
 <style>
@@ -40,7 +42,9 @@ retry.onclick=()=>location.replace('/');
    if(!session?.user)throw new Error('Supabase did not create a Google session. Verify the Google callback URI and Supabase Redirect URLs.');
    sessionStorage.removeItem('soundwave-oauth-return');sessionStorage.removeItem('soundwave-oauth-error');
    statusEl.textContent='Signed in. Opening SoundWave…';
-   location.replace('/#/discover');
+   let next='/#/discover';
+   try{const pending=JSON.parse(sessionStorage.getItem('soundwave-pending-invite')||'null');sessionStorage.removeItem('soundwave-pending-invite');if(pending?.playlist_invite||pending?.subscription_invite){const q=new URLSearchParams();if(pending.playlist_invite)q.set('playlist_invite',pending.playlist_invite);if(pending.subscription_invite)q.set('subscription_invite',pending.subscription_invite);next=`/?${q.toString()}#/discover`;}}catch{}
+   location.replace(next);
  }catch(err){console.error(err);fail(err?.message||String(err));}
 })();
 </script>
