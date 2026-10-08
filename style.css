@@ -4216,3 +4216,44 @@ body.artist-scrolled[data-page="artist-detail"] .artist-profile-hero{opacity:1!i
   .artist-sticky-bar{top:6px!important;width:calc(100% - 8px);margin:6px 0 -54px!important}
   .tracks.has-extra.extra-streams .t-extra-streams{display:none!important}
 }
+
+/* v48 targeted UX refinement: v39 admin surface, native scrolling and responsive controls */
+html,body{scroll-behavior:auto!important}
+.workspace .main,.workspace .sidebar,.workspace .context-rail,.library-scroll,.dashboard-content,.admin-table-wrap,.admin-panel,.payment-grid{scroll-behavior:auto!important;overscroll-behavior-y:auto}
+.workspace .main{overflow-x:hidden;scrollbar-gutter:stable}
+.admin-view-tabs{display:flex;position:sticky;top:0;z-index:24;gap:8px;overflow-x:auto;max-width:100%;padding:12px 10px;background:#101713f2;backdrop-filter:blur(14px);border:1px solid #ffffff11;border-radius:14px;scrollbar-width:none}
+.admin-view-tabs::-webkit-scrollbar{display:none}
+.admin-view-tabs button{flex:0 0 auto;min-height:40px;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.admin-block{min-width:0;scroll-margin-top:76px}
+.admin-block[hidden],.admin-panel[hidden]{display:none!important}
+.admin-overview{grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr))}
+.admin-summary-grid{grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))}
+.admin-tabbar{position:sticky;top:64px;z-index:22;max-width:100%;overflow-x:auto;scrollbar-width:none;background:#111914f5;backdrop-filter:blur(14px);padding:8px 4px}
+.admin-tabbar::-webkit-scrollbar{display:none}
+.moderation-commandbar{position:relative;display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-width:0;overflow:visible}
+.moderation-search{flex:1 1 225px;min-width:0}
+.moderation-commandbar select{max-width:100%}
+.admin-table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.admin-table{min-width:650px}
+.admin-song-card,.payment-request-card,.admin-summary-card{min-width:0;overflow-wrap:anywhere}
+.admin-song-card-copy{min-width:0}
+.library-filter-shell{grid-template-columns:minmax(0,1fr) 36px}
+.library-filter-arrow{width:36px;height:36px;flex:none;box-shadow:0 2px 10px #0005}
+.library-filter-arrow:focus-visible{outline:2px solid #1ed760;outline-offset:3px}
+.library-filter-row{scroll-behavior:smooth!important}
+body[data-page="artist-detail"] .artist-profile-hero{min-width:0;min-height:240px;transition:none!important;transform:none!important;opacity:1!important;background-attachment:local}
+body[data-page="artist-detail"] .artist-sticky-bar{position:sticky;top:0;z-index:30;background:#512634!important;border-radius:10px 10px 0 0;min-height:70px;padding-block:12px}
+body[data-page="artist-detail"] .artist-sticky-bar:not(.show){visibility:hidden}
+body[data-page="artist-detail"] .artist-sticky-bar.show{visibility:visible}
+body[data-page="artist-detail"] .artist-sticky-play{background:#1ed760;color:#07170c}
+body[data-page="artist-detail"] .artist-section{scroll-margin-top:84px}
+.upload-wizard-dialog,.upload-wizard-dialog form,.upload-wizard-dialog .wizard-step{min-width:0;max-width:100%}
+.upload-wizard-dialog form{overflow-x:hidden!important;overscroll-behavior-y:auto}
+.upload-wizard-dialog .wizard-step>*{min-width:0;max-width:100%}
+.upload-wizard-dialog label,.upload-wizard-dialog .album-choice,.upload-wizard-dialog .release-choice{overflow-wrap:anywhere;min-width:0}
+.upload-wizard-dialog img,.upload-wizard-dialog .cover-img{max-width:100%;object-fit:cover}
+.upload-wizard-dialog .dialog-actions{position:sticky;bottom:0;z-index:6;background:#19211d;padding:12px 0;display:flex;flex-wrap:wrap;gap:8px}
+.upload-wizard-dialog input,.upload-wizard-dialog select,.upload-wizard-dialog textarea{max-width:100%;min-width:0}
+@media(max-width:700px){.admin-view-tabs{top:0;padding:8px 6px}.admin-tabbar{top:56px}.admin-overview,.admin-summary-grid{grid-template-columns:1fr 1fr}.moderation-commandbar{align-items:stretch}.moderation-commandbar>button,.moderation-commandbar>select{flex:1 1 auto}.upload-wizard-dialog .dialog-actions>*{flex:1 1 120px}body[data-page="artist-detail"] .artist-sticky-bar{min-height:62px}}
+@media(max-width:400px){.admin-overview,.admin-summary-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.library-filter-row{scroll-behavior:auto!important} .admin-view-tabs button{transition:none}}
