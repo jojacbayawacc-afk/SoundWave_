@@ -4304,3 +4304,17 @@ body[data-page="artist-detail"] .artist-section .tracks-head{background:#202a27!
 .artist-cover-controls small{color:#bdc9c0;overflow-wrap:anywhere;max-width:360px}
 .artist-cover-controls small.upload-error{color:#ffaaa9}
 .artist-cover-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;clip-path:inset(50%);pointer-events:none}
+
+/* Admin moderation: responsive command bar and clean filter containment */
+body[data-page="admin"] .moderation-commandbar{display:grid;grid-template-columns:minmax(220px,1fr) minmax(145px,185px) auto auto;align-items:center;gap:12px;padding:14px;background:#142019;border:1px solid #314338;border-radius:14px;max-width:100%;min-width:0;box-sizing:border-box;isolation:isolate}
+body[data-page="admin"] .moderation-search{display:flex;align-items:center;gap:10px;min-width:0;width:100%;max-width:100%;margin:0;border:1px solid #3b5143;border-radius:10px;background:#0d1511;padding:0 12px;box-sizing:border-box;overflow:hidden}
+body[data-page="admin"] .moderation-search svg{flex:none;opacity:.75}
+body[data-page="admin"] .moderation-search input{display:block;flex:1;min-width:0;width:100%;height:43px;padding:0;border:0;outline:0;background:transparent;color:#f3fff5;font:inherit;box-shadow:none}
+body[data-page="admin"] .moderation-commandbar select,body[data-page="admin"] .moderation-commandbar button{min-width:0;max-width:100%;box-sizing:border-box}
+body[data-page="admin"] .moderation-visible-count{white-space:nowrap;text-align:right;font-size:12px;opacity:.75}
+body[data-page="admin"] [data-admin-row][hidden]{display:none!important}
+.artist-cover-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;min-width:0;max-width:100%}
+.artist-cover-preview{width:154px;height:67px;flex:none;border-radius:9px;overflow:hidden;border:1px solid #526353;background:linear-gradient(120deg,#20382a,#16241b);display:flex;align-items:center;justify-content:center;color:#c1cec5;font-size:11px;text-align:center}
+.artist-cover-preview img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:1050px){body[data-page="admin"] .moderation-commandbar{grid-template-columns:minmax(0,1fr) minmax(135px,175px)}body[data-page="admin"] .moderation-visible-count{text-align:left}}
+@media(max-width:560px){body[data-page="admin"] .moderation-commandbar{grid-template-columns:minmax(0,1fr)}body[data-page="admin"] .moderation-commandbar>*,body[data-page="admin"] .moderation-commandbar button,body[data-page="admin"] .moderation-commandbar select{width:100%}.artist-cover-preview{width:100%;height:92px}}
