@@ -4115,3 +4115,31 @@ body{background:radial-gradient(circle at 72% -10%,rgba(23,164,83,.16),transpare
 .admin-ref-card .moderation-commandbar{margin:0 0 12px}.admin-ref-card .admin-tabbar{margin:0 0 12px}.admin-ref-card .admin-table-wrap{border-color:#26352d;background:#0d1410}.admin-ref-card .admin-table th{background:#0b110d}.admin-ref-card .admin-table tbody tr:hover{background:#121b16}
 @media(max-width:1100px){.admin-ref-shell{grid-template-columns:64px minmax(0,1fr)}.admin-ref-nav{padding:7px}.admin-ref-nav button{justify-content:center;padding:0}.admin-ref-nav button span,.admin-ref-brand strong{display:none}.admin-ref-brand{justify-content:center}.admin-ref-grid{grid-template-columns:1fr}.admin-ref-side{grid-template-columns:1fr 1fr}.admin-ref-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.admin-ref-shell{display:block;padding:10px;border-radius:18px}.admin-ref-nav{position:sticky;top:0;z-index:8;display:grid;grid-template-columns:repeat(5,1fr);border-right:0;border-bottom:1px solid rgba(255,255,255,.08);padding:6px 0 10px;margin-bottom:10px;background:#08100c}.admin-ref-nav button{min-height:42px}.admin-ref-nav button span,.admin-ref-brand{display:none}.admin-ref-header{align-items:center}.admin-ref-header p{display:none}.admin-period-select{min-width:112px}.admin-ref-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.admin-ref-kpis article{min-height:86px;padding:11px}.admin-ref-kpis strong{font-size:23px}.admin-ref-grid,.admin-ref-side{grid-template-columns:1fr}.preview-head{display:none}.preview-row{grid-template-columns:36px minmax(0,1fr) auto;gap:8px}.preview-row>span:nth-of-type(1),.preview-row>span:nth-of-type(2){display:none}.preview-row .status-pill{justify-self:end}.preview-action{display:none}.admin-ref-card{padding:11px}.admin-ref-filter-pills{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.admin-ref-filter-pills::-webkit-scrollbar{display:none}}
+
+/* v45 accessibility focus states */
+.genre-select-trigger:focus-visible,.genre-option:focus-visible,.genre-select-search input:focus-visible,.wizard-steps li:focus-visible{
+  outline:2px solid #1ed760;
+  outline-offset:2px;
+}
+
+
+/* v46 — scalable Artist Studio song editor */
+.edit-song-dialog{width:min(760px,calc(100vw - 28px));max-height:min(86vh,820px)}
+.edit-song-picker{display:grid;gap:12px;min-width:0}
+.edit-song-search{display:flex;align-items:center;gap:10px;padding:0 14px;min-height:46px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.045)}
+.edit-song-search:focus-within{border-color:rgba(55,214,122,.72);box-shadow:0 0 0 3px rgba(55,214,122,.10)}
+.edit-song-search svg{flex:0 0 auto;opacity:.65}
+.edit-song-search input{min-width:0;width:100%;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
+.edit-song-results{display:grid;gap:6px;max-height:300px;overflow:auto;padding:4px;margin:0 -4px;scrollbar-width:thin}
+.edit-song-option{display:grid;grid-template-columns:44px minmax(0,1fr) 24px;align-items:center;gap:12px;width:100%;padding:9px 10px;border:1px solid transparent;border-radius:11px;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.edit-song-option:hover,.edit-song-option:focus-visible{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.08)}
+.edit-song-option.selected{background:rgba(55,214,122,.10);border-color:rgba(55,214,122,.36)}
+.edit-song-option .real-cover,.edit-song-option .placeholder-art{width:44px;height:44px;border-radius:8px;object-fit:cover}
+.edit-song-option span{display:grid;min-width:0;gap:3px}
+.edit-song-option strong,.edit-song-option small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edit-song-option small{color:var(--muted,#9ca3a0)}
+.edit-song-option i{display:grid;place-items:center;opacity:.45;transform:rotate(-90deg)}
+.edit-song-selected{padding:12px 14px;border-radius:11px;background:rgba(55,214,122,.07);border:1px solid rgba(55,214,122,.18)}
+.edit-song-selected small,.edit-song-selected span{display:block;color:var(--muted,#9ca3a0)}
+.edit-song-selected strong{display:block;margin:3px 0;font-size:15px}
+@media(max-width:600px){.edit-song-dialog{width:calc(100vw - 18px);max-height:90vh}.edit-song-results{max-height:38vh}.edit-song-option{grid-template-columns:40px minmax(0,1fr) 20px;padding:8px}.edit-song-option .real-cover,.edit-song-option .placeholder-art{width:40px;height:40px}}
