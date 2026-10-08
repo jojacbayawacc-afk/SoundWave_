@@ -4420,3 +4420,25 @@ body[data-page="admin"] .admin-block{overflow:visible!important}
  body[data-page="admin"] .moderation-top-toolbar{top:58px!important;position:relative!important}
  body[data-page="admin"] .admin-tabbar{top:56px!important}
 }
+
+/* v47.3 — admin moderation: a single natural scrolling surface.
+   Do not stack multiple sticky toolbars on top of content rows. */
+body[data-page="admin"] .admin-view-tabs,
+body[data-page="admin"] .admin-tabbar,
+body[data-page="admin"] .moderation-commandbar,
+body[data-page="admin"] .admin-tabs {
+  position:relative!important; top:auto!important; z-index:auto!important;
+  inset-block-start:auto!important; transform:none!important;
+}
+body[data-page="admin"] .admin-view-tabs {
+  border-radius:12px 12px 0 0; box-shadow:none; margin-bottom:0;
+  background:#101713; backdrop-filter:none;
+}
+body[data-page="admin"] .moderation-commandbar {
+  background:#101713; backdrop-filter:none; border-radius:0;
+}
+body[data-page="admin"] .admin-tabbar {
+  background:#101713; backdrop-filter:none; border-radius:0;
+  border-bottom:1px solid rgba(255,255,255,.09); margin-bottom:14px;
+}
+body[data-page="admin"] .admin-table-wrap {scroll-margin-top:12px}
