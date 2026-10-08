@@ -500,6 +500,20 @@ function navigate(page, extras = {}) {
   render();
   if (page === 'artist-detail') void refreshViewedArtistCover(state.selectedArtist);
   const main = document.getElementById('main-content'); if (main) main.scrollTop = 0;
+  if (page === 'artist-detail' && state.selectedArtist) {
+    // Search-card navigation renders immediately; the popularity RPC is async.
+    // Refresh the visible artist only after the correct artist's counts arrive.
+    const openedArtist = Number(state.selectedArtist);
+    void loadArtistPopularity(openedArtist).then(() => {
+      if (state.page === 'artist-detail' && Number(state.selectedArtist) === openedArtist) {
+        const main = document.getElementById('main-content');
+        const previousScroll = main?.scrollTop || 0;
+        render();
+        const updatedMain = document.getElementById('main-content');
+        if (updatedMain) updatedMain.scrollTop = previousScroll;
+      }
+    }).catch(error => console.warn('Artist stream counts could not load:', error));
+  }
   if (page === 'admin' || page === 'admin-dashboard') scheduleStreamMetricsRefresh();
   if (page === 'history') void refreshHistory(true);
 }
@@ -1561,6 +1575,7 @@ function artistDetail() {
   const artist = state.artists.find((a) => Number(a.artist_id) === Number(state.selectedArtist));
   if (!artist) return artists();
   const popularity=state.artistPopularity?.[String(artist.artist_id)]||{};
+  const popularityLoaded=Object.prototype.hasOwnProperty.call(state.artistPopularity||{},String(artist.artist_id));
   const releases = [...songsByArtist(artist.artist_id)].sort((a,b)=>(Number(popularity[b.song_id]||0)-Number(popularity[a.song_id]||0))||(Number(b.song_id)-Number(a.song_id)));
   const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id));
   const own = isOwnArtist(artist), fc = followerText(artist.artist_id);
@@ -1569,7 +1584,7 @@ function artistDetail() {
   state.tint = tintFor(artist.artist_id);
   shell(`<div class="artist-sticky-bar" id="artist-sticky-bar" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-sticky-avatar" style="background:${grad(artist.artist_id)}">${esc(artist.artist_name?.[0] || 'A')}</span><strong>${esc(artist.artist_name)}</strong>${releases.length ? `<button type="button" class="artist-sticky-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button>` : ''}</div><section class="artist-profile-hero" id="artist-profile-hero" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-profile-avatar" style="background:${grad(artist.artist_id)}">${esc(artist.artist_name?.[0] || 'A')}</span><div><span class="coll-kind">Artist</span><h1 class="coll-title">${esc(artist.artist_name)}</h1><p class="coll-sub">${fc ? `<strong data-follower-count="${artist.artist_id}">${fc}</strong> · ` : ''}${albums.length} ${albums.length === 1 ? 'release' : 'releases'} · ${releases.length} ${releases.length === 1 ? 'song' : 'songs'}${artist.country ? ' · ' + esc(artist.country) : ''}</p></div></section>
 <div class="coll-actions artist-primary-actions">${releases.length ? `<button type="button" class="sw-big-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button>` : ''}${own ? `<button type="button" class="follow-btn" data-nav="followers">View your followers</button>` : followBtn(artist)}</div>
-${releases.length ? `<section class="artist-section"><div class="section-heading"><div><h2>Popular</h2><span class="muted small">Ranked by qualified stream count</span></div></div>${trackTable(releases.slice(0, 10), { queue: ids(releases), showAlbum: false, extraLabel: 'Streams', extraClass: 'streams', extraCell: (song)=>Number(popularity[song.song_id]||0).toLocaleString() })}</section>` : ''}
+${releases.length ? `<section class="artist-section"><div class="section-heading"><div><h2>Popular</h2><span class="muted small">Ranked by qualified stream count</span></div></div>${trackTable(releases.slice(0, 10), { queue: ids(releases), showAlbum: false, extraLabel: 'Streams', extraClass: 'streams', extraCell: (song)=>popularityLoaded ? Number(popularity[song.song_id]||0).toLocaleString() : '…' })}</section>` : ''}
 ${albums.length ? `<section class="shelf-section artist-section"><div class="section-heading"><h2>Discography</h2></div><div class="shelf">${albums.map(albumTile).join('')}</div></section>` : '<div class="empty">No published releases yet.</div>'}
 ${artist.bio ? `<section class="about-card artist-section"><h2>About</h2><p>${esc(artist.bio)}</p></section>` : ''}`, '', '');
 }
