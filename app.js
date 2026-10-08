@@ -468,6 +468,34 @@ function navigate(page, extras = {}) {
   if (page === 'admin' || page === 'admin-dashboard') scheduleStreamMetricsRefresh();
   if (page === 'history') void refreshHistory(true);
 }
+// Persistent admin-dashboard navigation: survives every shell redraw and does not
+// rely on handlers attached to individual buttons during rendering.
+function openAdminDashboardSection(target) {
+  if (!hasAdminAccess()) { toast('Admin access is required.', true); return; }
+  const destination = String(target || '').toLowerCase();
+  const valid = ['moderation', 'analytics', 'catalog', 'payments'];
+  if (!valid.includes(destination)) return;
+  state.adminView = destination === 'analytics' ? 'analytics'
+    : destination === 'payments' ? 'payments' : 'moderation';
+  if (destination === 'catalog') state.adminTab = 'songs';
+  else if (destination === 'moderation') state.adminTab = 'accounts';
+  state.adminQuery = '';
+  state.adminStatus = 'all';
+  state.adminPriority = false;
+  navigate('admin');
+  // Protect against route transitions that leave the former page rendered.
+  if (state.page === 'admin') {
+    const section = document.querySelector(`[data-admin-view="${state.adminView}"]`);
+    if (section) section.hidden = false;
+  }
+}
+document.addEventListener('click', (event) => {
+  const button = event.target.closest?.('[data-admin-dashboard-action]');
+  if (!button || !button.isConnected) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  openAdminDashboardSection(button.dataset.adminDashboardAction);
+}, true);
 function goBack() { window.history.back(); }
 function goForward() { window.history.forward(); }
 function albumArt(song, size='tile'){
@@ -1617,7 +1645,7 @@ function adminDashboard(){if(!hasAdminAccess())return discoverPage();
  <section class="studio-stat-strip four admin-dashboard-stats"><div><small>Total users</small><strong data-count="${users.length}">${users.length}</strong><span>${activeUsers} active</span></div><div><small>Active creators</small><strong data-count="${activeArtists}">${activeArtists}</strong><span>${artists.length} artist profiles</span></div><div><small>Qualified streams</small><strong data-count="${chart.total}">${chart.total}</strong><span>Last 30 days</span></div><div><small>Needs attention</small><strong data-count="${inactiveContent}">${inactiveContent}</strong><span>Inactive content</span></div></section>
  <div class="creator-summary-grid admin-dashboard-actions"><article><span class="eyebrow">MODERATION</span><h3>User & content review</h3><p>Manage accounts, artists, songs and podcasts with the protected admin controls.</p><button class="button secondary" data-admin-dashboard-action="moderation">${icon('shield')} Open moderation</button></article><article><span class="eyebrow">PERFORMANCE</span><h3>${chart.most?esc(chart.most.name):'No streams yet'}</h3><p>${chart.most?`${chart.most.value.toLocaleString()} qualified streams on the leading track.`:'Platform stream analytics will appear after qualified plays are recorded.'}</p><button class="button secondary" data-admin-dashboard-action="analytics">${icon('chart')} View analytics</button></article><article><span class="eyebrow">CATALOG</span><h3>${songs.length} songs · ${pods.length} podcasts</h3><p>${inactiveContent?`${inactiveContent} item${inactiveContent===1?'':'s'} currently inactive and worth reviewing.`:'No inactive catalog items need attention.'}</p><button class="button secondary" data-admin-dashboard-action="catalog">${icon('music')} Review catalog</button></article></div>
  ${adminChartsHtml(users)}`,'Admin Dashboard',`Welcome back, ${state.profile?.display_name||'Admin'}.`);
- document.querySelectorAll('[data-admin-dashboard-action]').forEach(button=>{button.onclick=()=>{const target=button.dataset.adminDashboardAction;state.adminView=target==='analytics'?'analytics':'moderation';if(target==='catalog')state.adminTab='songs';else if(target==='moderation')state.adminTab='accounts';navigate('admin');};});
+ // Admin dashboard actions use the persistent delegated handler below.
 }
 function home(){const target=primaryDashboard();if(target==='admin-dashboard')return adminDashboard();if(target==='artist-dashboard')return artistDashboard();return discoverPage();}
 function music() {
