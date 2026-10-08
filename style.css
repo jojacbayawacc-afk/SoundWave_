@@ -4143,3 +4143,76 @@ body{background:radial-gradient(circle at 72% -10%,rgba(23,164,83,.16),transpare
 .edit-song-selected small,.edit-song-selected span{display:block;color:var(--muted,#9ca3a0)}
 .edit-song-selected strong{display:block;margin:3px 0;font-size:15px}
 @media(max-width:600px){.edit-song-dialog{width:calc(100vw - 18px);max-height:90vh}.edit-song-results{max-height:38vh}.edit-song-option{grid-template-columns:40px minmax(0,1fr) 20px;padding:8px}.edit-song-option .real-cover,.edit-song-option .placeholder-art{width:40px;height:40px}}
+
+/* v47 — overflow, role dashboards, artist profile ranking/scroll polish */
+.library-filter-shell{display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;gap:6px;min-width:0;margin:2px 0 8px}
+.library-filter-row{display:flex!important;gap:7px;min-width:0;overflow-x:auto!important;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;padding:2px 1px}
+.library-filter-row::-webkit-scrollbar{display:none}
+.library-filter-row .filter-pill{flex:0 0 auto;max-width:none;scroll-snap-align:start;white-space:nowrap}
+.library-filter-arrow{width:32px;height:32px;border-radius:50%;border:1px solid #ffffff16;background:#202522;color:#fff;display:grid;place-items:center;padding:0;transition:transform .18s ease,background .18s ease}
+.library-filter-arrow:hover{background:#2b322e}
+.library-filter-arrow svg{width:15px;height:15px}
+.library-filter-arrow.at-end{transform:rotate(180deg)}
+.library-filter-arrow[hidden]{display:none!important}
+.library-collapsed .library-filter-shell{display:none}
+
+.edit-song-dialog{width:min(820px,calc(100vw - 24px))!important;max-height:min(90dvh,860px)!important;padding:0!important;overflow:hidden!important}
+.edit-song-dialog .edit-surface-head{position:sticky;top:0;z-index:4;padding:22px 24px 18px;background:#1b1f1d;border-bottom:1px solid #ffffff10}
+.edit-song-dialog .edit-surface-head h2{font-size:clamp(26px,4vw,38px);line-height:1.05;overflow-wrap:anywhere}
+.edit-song-dialog .edit-surface-head p{max-width:620px;overflow-wrap:anywhere}
+.edit-song-dialog .edit-surface-form{max-height:calc(90dvh - 116px);overflow-y:auto;overflow-x:hidden;padding:18px 24px 0!important;scrollbar-width:thin;scrollbar-color:#465149 transparent;overscroll-behavior:contain}
+.edit-song-dialog .edit-surface-form::-webkit-scrollbar{width:7px}.edit-song-dialog .edit-surface-form::-webkit-scrollbar-thumb{background:#465149;border-radius:999px}
+.edit-song-dialog .edit-song-results{max-height:min(34dvh,280px);overflow:auto;min-width:0;padding-right:3px}
+.edit-song-dialog .edit-song-option{min-width:0;overflow:hidden}
+.edit-song-dialog .edit-song-option>span{min-width:0}
+.edit-song-dialog .edit-song-selected{min-width:0;overflow:hidden}
+.edit-song-dialog .edit-song-selected strong,.edit-song-dialog .edit-song-selected span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edit-song-dialog .edit-fields,.edit-song-dialog .single-field{min-width:0}
+.edit-song-dialog input{min-width:0;max-width:100%}
+.edit-song-dialog .edit-surface-actions{position:sticky;bottom:0;z-index:5;margin:18px -24px 0!important;padding:14px 24px 16px!important;background:#1b1f1df2;border-top:1px solid #ffffff10;backdrop-filter:blur(14px)}
+
+.upload-wizard-dialog{width:min(900px,calc(100vw - 24px))!important;max-height:92dvh!important}
+.upload-wizard-dialog form{max-height:calc(92dvh - 112px)!important;overflow-x:hidden!important;overscroll-behavior:contain;padding-bottom:18px!important}
+.upload-wizard-dialog .upload-step,.upload-wizard-dialog .track-detail-grid,.upload-wizard-dialog .track-detail-fields,.upload-wizard-dialog .track-art-column{min-width:0}
+.upload-wizard-dialog .album-picks{grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))!important;max-height:min(38dvh,330px)!important;overflow-y:auto!important;overflow-x:hidden!important;padding-right:4px;scrollbar-width:thin;scrollbar-color:#465149 transparent}
+.upload-wizard-dialog .album-pick{grid-template-columns:18px 48px minmax(0,1fr) 20px!important;min-width:0!important;overflow:hidden!important}
+.upload-wizard-dialog .album-pick strong,.upload-wizard-dialog .album-pick small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-wizard-dialog .audio-drop,.upload-wizard-dialog .selected-audio-card{min-width:0;overflow:hidden}
+.upload-wizard-dialog .selected-audio-card>div{min-width:0}.upload-wizard-dialog .selected-audio-card strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-wizard-dialog .single-field input,.upload-wizard-dialog .single-field textarea,.upload-wizard-dialog .genre-select-trigger{min-width:0;max-width:100%}
+.upload-wizard-dialog .dialog-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.upload-wizard-dialog .dialog-actions .wiz-back{margin-right:auto}
+
+.admin-hero{background:radial-gradient(circle at 78% 25%,rgba(30,215,96,.25),transparent 34%),linear-gradient(135deg,#173626,#151a18 68%)!important}
+.admin-dashboard-stats,.admin-dashboard-actions{margin-bottom:18px}
+.admin-dashboard-actions article{min-height:180px}
+.admin-dashboard-actions .button{margin-top:auto;align-self:flex-start}
+.admin-dashboard-actions article{display:flex;flex-direction:column}
+.admin-suite{margin-top:8px}
+
+/* Floating artist identity: no full-width black strip and no layout gap. */
+body[data-page="artist-detail"] .dashboard-content{padding-top:0}
+.artist-sticky-bar{top:10px!important;width:min(680px,calc(100% - 12px));margin:8px 0 -58px!important;padding:8px 12px!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:14px!important;background:rgba(18,22,20,.88)!important;box-shadow:0 12px 34px rgba(0,0,0,.28);backdrop-filter:blur(18px);transform:translateY(-12px) scale(.985)!important;opacity:0!important;visibility:hidden;pointer-events:none;transition:opacity .2s ease,transform .24s cubic-bezier(.22,1,.36,1),visibility .2s!important}
+.artist-sticky-bar.show{opacity:1!important;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1)!important}
+body[data-page="artist-detail"] .artist-profile-hero{transition:none!important}
+body.artist-scrolled[data-page="artist-detail"] .artist-profile-hero{opacity:1!important;transform:none!important}
+.artist-section .tracks.has-extra.extra-streams .t-extra-streams{text-align:right;font-variant-numeric:tabular-nums;color:#cfd6d1}
+.artist-section .tracks.has-extra.extra-streams .tracks-head .t-extra-streams{color:#8f9992}
+
+@media(max-width:700px){
+  .edit-song-dialog{width:calc(100vw - 12px)!important;max-height:94dvh!important;border-radius:18px!important}
+  .edit-song-dialog .edit-surface-head{padding:18px 16px 14px}
+  .edit-song-dialog .edit-surface-form{max-height:calc(94dvh - 100px);padding:14px 16px 0!important}
+  .edit-song-dialog .edit-song-results{max-height:30dvh}
+  .edit-song-dialog .edit-surface-actions{margin-inline:-16px!important;padding-inline:16px!important}
+  .edit-song-dialog .edit-song-option{grid-template-columns:40px minmax(0,1fr) 18px;gap:9px}
+  .upload-wizard-dialog{width:calc(100vw - 12px)!important;max-height:94dvh!important;border-radius:18px!important}
+  .upload-wizard-dialog form{max-height:calc(94dvh - 104px)!important;padding-inline:14px!important}
+  .upload-wizard-dialog .album-picks{grid-template-columns:1fr!important;max-height:34dvh!important}
+  .upload-wizard-dialog .track-detail-grid{grid-template-columns:1fr!important;gap:14px!important}
+  .upload-wizard-dialog .track-art-column{max-width:210px;width:100%;margin-inline:auto}
+  .upload-wizard-dialog .dialog-actions{margin-inline:-14px!important;padding-inline:14px!important}
+  .upload-wizard-dialog .dialog-actions .button{flex:1 1 120px;min-width:0;white-space:normal}
+  .artist-sticky-bar{top:6px!important;width:calc(100% - 8px);margin:6px 0 -54px!important}
+  .tracks.has-extra.extra-streams .t-extra-streams{display:none!important}
+}
