@@ -4442,3 +4442,121 @@ body[data-page="admin"] .admin-tabbar {
   border-bottom:1px solid rgba(255,255,255,.09); margin-bottom:14px;
 }
 body[data-page="admin"] .admin-table-wrap {scroll-margin-top:12px}
+
+/* ===== Audit F-04…F-19 / FR-01: final override layer ===== */
+:root{--sw-surface:#15181a;--sw-surface-2:#191d20;--sw-surface-3:#0f1213;--sw-edge:rgba(255,255,255,.06)}
+/* F-06: history rows represent past events, not active player instances. */
+.history-tracks .track.playing,.history-tracks .track.paused{background:transparent!important;box-shadow:none!important}
+.history-tracks .track .eq{display:none!important}
+/* F-07 search accessories, explicitly override input button display rules */
+.global-search [hidden],.page-search [hidden],.global-search .search-clear[hidden],.page-search .search-clear[hidden],.global-search .search-browse[hidden],.page-search .search-browse[hidden]{display:none!important}
+/* F-11 toast stack */
+.toast-stack{position:fixed;z-index:100000;top:max(14px,env(safe-area-inset-top));right:16px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:min(380px,calc(100vw - 32px));pointer-events:none}
+.toast-stack .toast{position:relative!important;inset:auto!important;transform:translateY(-8px);width:100%;max-width:100%;display:flex;align-items:center;gap:10px;pointer-events:auto;margin:0;opacity:0;transition:opacity .18s,transform .18s}
+.toast-stack .toast.show{transform:translateY(0);opacity:1}
+.toast-stack .toast-close{border:0;background:transparent;color:inherit;margin-left:auto;padding:4px 7px;cursor:pointer;font-size:20px}
+.toast-stack .toast.toast-pulse{animation:sw-toast-pulse .22s ease-out}
+@keyframes sw-toast-pulse{50%{filter:brightness(1.3)}}
+/* F-08: release choice labels keep a real middle text column */
+.album-pick{display:grid!important;grid-template-columns:20px 48px minmax(140px,1fr) auto!important;align-items:center;column-gap:12px;min-width:0}
+.album-pick input{grid-column:1;grid-row:1/3}
+.album-pick > span{grid-column:2;grid-row:1/3;width:48px;height:48px;min-width:48px}
+.album-pick > strong{grid-column:3;grid-row:1;min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.album-pick > small{grid-column:3;grid-row:2;min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.album-pick > svg{grid-column:4;grid-row:1/3}
+.song-manager-card,.admin-song-card{min-width:0;max-width:100%;overflow:hidden}
+.song-manager-card strong,.admin-song-card-copy strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* F-12 and F-18 upload wizard density and unified footer */
+.wizard-steps{padding:6px 12px 12px!important;margin-bottom:14px!important}
+.wizard-steps li span{width:26px!important;height:26px!important}
+.wizard-dialog .modal-head{padding-bottom:6px!important}
+.upload-step{margin-top:4px!important}
+.upload-wizard-dialog .dialog-actions,.wizard-dialog .dialog-actions,.release-create-dialog .release-dialog-actions{background:var(--sw-surface)!important;background-image:none!important;backdrop-filter:none!important;border-top:1px solid var(--sw-edge)!important;box-shadow:none!important}
+/* F-13: no nested input focus ring. Preserve established app header structure. */
+.global-search:focus-within{outline:1px solid rgba(255,255,255,.8)!important;outline-offset:0!important;border-color:rgba(255,255,255,.8)!important;box-shadow:0 0 0 1px rgba(255,255,255,.35)!important}
+.global-search input:focus,.global-search input:focus-visible,.global-search button:focus-visible{outline:none!important;box-shadow:none!important}
+/* F-14 distinct roles, no new brand colors */
+.podcast-studio-hero--artist{background:linear-gradient(115deg,rgba(14,92,54,.4),rgba(69,40,92,.24))!important}
+.podcast-studio-hero--admin{background:linear-gradient(115deg,rgba(91,63,27,.38),rgba(89,31,41,.28))!important}
+.podcast-studio-hero--artist-admin{background:linear-gradient(115deg,rgba(14,92,54,.34),rgba(91,63,27,.28))!important}
+.podcast-studio-hero[data-studio-role]::after{content:attr(data-studio-role);text-transform:uppercase;letter-spacing:.08em;font-size:10px;opacity:.7;position:absolute;right:18px;top:14px}
+.status-pill.draft{background:rgba(255,255,255,.08);color:var(--text-muted,#aab2ac)}
+/* F-19 material system applied to dialogs, inner cards and fields, not brand heroes */
+.sw-modal,.wizard-dialog,.creator-dialog,.release-create-dialog,.edit-surface-dialog,.studio-dialog,.reference-edit-dialog,.upload-wizard-dialog,.info-dialog,.confirm-dialog{background:var(--sw-surface)!important;border:1px solid var(--sw-edge)!important}
+.sw-modal .modal-head,.sw-modal .dialog-actions,.wizard-dialog .dialog-actions{background:var(--sw-surface)!important}
+.sw-modal input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),.sw-modal textarea,.sw-modal select{background:var(--sw-surface-3);border-color:var(--sw-edge)}
+.plan-card,.chart-card,.stat-card,.admin-album-card,.podcast-studio-card,.profile-shortcut{background:var(--sw-surface-2);border-color:var(--sw-edge)}
+/* FR-01 karaoke overlays normal page while keeping player controls */
+body.karaoke-mode .workspace .main>.dashboard-content{display:none!important}
+.karaoke-panel{height:100%;width:min(860px,100%);margin:auto;padding:clamp(28px,5vw,70px) 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:34px;overflow:auto;text-align:center}
+.karaoke-panel h2{font-size:clamp(24px,3vw,40px)}
+.karaoke-lines{white-space:pre-line;line-height:1.75;font-size:clamp(20px,2.7vw,34px);font-weight:700}
+[data-karaoke-toggle][aria-pressed=true]{color:var(--accent,#1ed760)}
+@media(max-width:700px){
+ /* F-04: avoid the title slot collapsing against buttons */
+ .artist-section .tracks .track,.artist-section .tracks .tracks-head{grid-template-columns:26px minmax(0,1fr) 40px 36px!important;grid-template-areas:'num title like more'!important;gap:6px!important}
+ .artist-section .tracks .t-num{grid-area:num}.artist-section .tracks .t-title{grid-area:title!important;min-width:0!important;width:100%!important;display:flex!important;overflow:hidden!important;gap:8px}
+ .artist-section .tracks .t-text{flex:1 1 0!important;min-width:0!important;width:0!important;overflow:hidden!important}
+ .artist-section .tracks .t-text>strong,.artist-section .tracks .t-text>small{display:block!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important}
+ .artist-section .tracks .t-title img,.artist-section .tracks .t-title .placeholder-art{width:42px!important;height:42px!important;min-width:42px!important;flex:0 0 42px!important}
+ .artist-section .tracks .t-like{grid-area:like!important}.artist-section .tracks .t-more{grid-area:more!important}
+ .artist-section .tracks .t-time,.artist-section .tracks .t-extra,.artist-section .tracks .t-album{display:none!important}
+ /* F-05: moderation cards must stay entirely within viewport */
+ .admin-table-wrap{overflow:visible!important;max-width:100%!important}
+ .admin-table,.admin-table tbody{display:block!important;width:100%!important;min-width:0!important}
+ .admin-table thead{display:none!important}
+ .admin-table tr{display:grid!important;width:100%!important;max-width:100%!important;padding:14px!important;margin-bottom:12px!important;border:1px solid var(--sw-edge)!important;border-radius:14px;overflow:hidden}
+ .admin-table td{display:grid!important;grid-template-columns:84px minmax(0,1fr)!important;gap:8px!important;align-items:center!important;max-width:100%!important;min-width:0!important;overflow-wrap:anywhere!important;white-space:normal!important;padding:7px 0!important}
+ .admin-table td::before{content:attr(data-label);color:var(--text-muted,#99a69d);font-size:11px;font-weight:700;text-transform:uppercase}
+ .admin-table .status-pill{justify-self:start!important;width:auto!important;max-width:max-content!important}
+ .admin-table .admin-row-actions{display:flex!important;flex-direction:column!important;align-items:stretch!important;max-width:100%!important;min-width:0!important;gap:8px}
+ .admin-table .admin-row-actions button{min-height:42px!important;width:100%!important;min-width:0!important;white-space:normal!important}
+ .admin-song-card{width:100%!important;max-width:100%!important;min-width:0!important}
+ /* F-10: compact analytics rail */
+ .artist-analytics-grid{display:grid!important;grid-template-columns:none!important;grid-auto-flow:column!important;grid-auto-columns:minmax(232px,78vw)!important;overflow-x:auto!important;scroll-snap-type:x mandatory!important;overscroll-behavior-inline:contain;gap:12px;scrollbar-width:thin}
+ .artist-analytics-grid>*{min-width:0!important;scroll-snap-align:start}
+ .artist-analytics-grid svg.sparkline{max-height:80px!important}
+ .wizard-steps li span{width:24px!important;height:24px!important}
+ .wizard-eyebrow{display:none!important}
+ .album-pick{grid-template-columns:18px 40px minmax(0,1fr)!important;column-gap:8px!important}
+ .album-pick > span{width:40px!important;height:40px!important;min-width:40px!important}
+ .album-pick > svg{display:none!important}
+}
+/* F-09 mobile lyrics panel: toggles inside existing now-playing without resetting audio. */
+.mobile-now-lyrics{position:absolute;inset:70px 14px 158px;z-index:5;background:var(--sw-surface-3);border:1px solid var(--sw-edge);border-radius:14px;padding:22px;overflow-y:auto;overscroll-behavior:contain;text-align:center}
+.mobile-now-lyrics[hidden]{display:none!important}
+.mobile-now-lyrics h3{margin:0 0 20px;font-size:16px}
+#mobile-now-lyrics-content{white-space:pre-line;line-height:1.7;font-size:clamp(16px,4vw,22px)}
+.mobile-now-playing.show-lyrics .mobile-now-art{visibility:hidden}
+#mobile-lyrics-toggle[aria-pressed=true]{color:var(--accent,#1ed760)}
+
+
+/* AUDIT MOBILE PASS — appended after prior design layers, 2026-10-08 */
+@media (max-width: 700px) {
+  html,body,#app,.workspace,.main,.dashboard-content,.page-body{max-width:100%;min-width:0}
+  .workspace .main{overflow-x:clip;overscroll-behavior-y:contain}
+  .dashboard-content,.page-body{box-sizing:border-box}
+  .dashboard-content>* , .page-body>*{min-width:0;max-width:100%}
+  .page-title,.section-heading h2,.artist-title,.chart-title{overflow-wrap:anywhere}
+  .admin-panel,.admin-content,.admin-moderation,.moderation-panel,.admin-tabs,.admin-toolbar,.admin-filter-bar{min-width:0;max-width:100%;box-sizing:border-box}
+  .admin-tabs,.admin-filters,.admin-category-tabs{overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;flex-wrap:nowrap;scroll-snap-type:x proximity}
+  .admin-tabs>* ,.admin-filters>*,.admin-category-tabs>*{flex-shrink:0;scroll-snap-align:start}
+  .admin-tabs::-webkit-scrollbar,.admin-filters::-webkit-scrollbar{display:none}
+  .admin-search,.admin-search input,.moderation-search,.moderation-search input{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+  .admin-table td>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+  .admin-table td .admin-row-actions{grid-column:1 / -1;max-width:100%}
+  .admin-table td .admin-row-actions button{max-width:100%;overflow-wrap:anywhere}
+  .song-manager-card,.admin-song-card,.album-pick,.upload-wizard-dialog,.wizard-dialog,.sw-modal{max-width:100%;min-width:0;box-sizing:border-box}
+  .album-pick>strong,.album-pick>small,.song-manager-card strong,.admin-song-card-copy{overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .upload-wizard-dialog .dialog-actions,.wizard-dialog .dialog-actions{display:flex;flex-wrap:wrap;gap:8px;box-sizing:border-box;max-width:100%}
+  .upload-wizard-dialog .dialog-actions button,.wizard-dialog .dialog-actions button{min-height:44px;max-width:100%;flex:1 1 120px}
+  .mobile-dock button,.player-bar button,.library-filter-arrow{touch-action:manipulation}
+}
+@media (max-width:400px) {
+  .artist-section .tracks .track{grid-template-columns:22px minmax(0,1fr) 34px 30px!important;gap:4px!important}
+  .artist-section .tracks .t-title img,.artist-section .tracks .t-title .placeholder-art{height:36px!important;width:36px!important;min-width:36px!important;flex-basis:36px!important}
+  .admin-table tr{padding:10px!important}
+  .admin-table td{grid-template-columns:70px minmax(0,1fr)!important;font-size:12px}
+  .artist-analytics-grid{grid-auto-columns:minmax(212px,85vw)!important}
+}
+@media(prefers-reduced-motion:reduce){.admin-tabs,.admin-filters,.artist-analytics-grid{scroll-behavior:auto!important;scroll-snap-type:none!important}}
