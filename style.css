@@ -4689,3 +4689,33 @@ body.karaoke-mode .karaoke-panel{max-width:850px;min-height:100%;align-items:cen
   .admin-album-detail .admin-song-card{min-width:0;max-width:100%}
 }
 @media(max-width:380px){.admin-albums-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* 2026-10-09: targeted UX corrections */
+/* Do not animate list tiles between filter states. */
+.sidebar-motion-indicator{display:none!important}
+.sidebar .library-item,.sidebar .library-art,.sidebar .library-filter-row,.sidebar .filter-pill,.sidebar .library-entry,.sidebar .library-list-item{transform:none!important;animation:none!important;transition:background-color .12s ease,border-color .12s ease,color .12s ease!important}
+.sidebar .sidebar-click-pop,.sidebar .library-item:hover,.sidebar .library-item.active{transform:none!important;filter:none!important}
+/* Karaoke is a full-workspace view: no empty left sidebar gutter. */
+body.karaoke-mode .workspace,body.karaoke-mode .workspace:has(.library-collapsed),body.karaoke-mode.rail-hidden .workspace{display:block!important;grid-template-columns:minmax(0,1fr)!important;padding-left:0!important;padding-right:0!important;max-width:none!important}
+body.karaoke-mode .workspace>.sidebar,body.karaoke-mode .workspace>.context-rail{display:none!important}
+body.karaoke-mode .workspace>.main{width:100%!important;max-width:none!important;margin:0!important;border-radius:0!important}
+body.karaoke-mode .karaoke-panel{width:100%!important;max-width:100%!important;margin:0!important;padding-inline:clamp(16px,4vw,64px)!important}
+/* Curated recommendations are a single horizontal rail, never expanded masonry. */
+.shelf.curated-slider{display:flex!important;flex-wrap:nowrap!important;gap:14px!important;overflow-x:auto!important;overflow-y:hidden!important;scroll-snap-type:x proximity;scroll-padding-inline:8px;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch;padding-bottom:16px;max-width:100%;min-width:0}
+.shelf.curated-slider>*{flex:0 0 clamp(158px,17vw,200px)!important;width:clamp(158px,17vw,200px)!important;min-width:0!important;scroll-snap-align:start}
+@media(max-width:700px){.shelf.curated-slider>*{flex-basis:min(62vw,185px)!important;width:min(62vw,185px)!important}}
+
+/* FIX 2026-10-09: song edit selector and podcast catalog hierarchy */
+.edit-song-dialog .edit-song-results{width:100%;min-width:0;overflow-x:hidden;overflow-y:auto}
+.edit-song-dialog .edit-song-option{display:grid!important;grid-template-columns:44px minmax(110px,1fr) 22px!important;gap:12px;width:100%;min-width:0;align-items:center;overflow:visible}
+.edit-song-dialog .edit-song-option > .real-cover,.edit-song-dialog .edit-song-option > .placeholder-art{width:44px;height:44px;min-width:44px;grid-column:1}
+.edit-song-dialog .edit-song-option > span:not(.placeholder-art){display:flex;flex-direction:column;min-width:0;width:auto;grid-column:2;overflow:hidden}
+.edit-song-dialog .edit-song-option strong,.edit-song-dialog .edit-song-option small{display:block;width:100%;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left}
+.edit-song-dialog .edit-song-option > i{grid-column:3}
+.edit-song-dialog .edit-song-option[hidden]{display:none!important}
+.podcast-catalog-rail{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:15px}
+.podcast-catalog-episodes{margin-top:22px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08)}
+.podcast-episode-catalog-row{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:12px;margin:8px 0;background:rgba(255,255,255,.025)}
+.podcast-episode-catalog-row>div{display:flex;flex-direction:column;min-width:0;gap:3px}.podcast-episode-catalog-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.podcast-episode-catalog-row small{color:var(--muted,#a0a7a3)}
+.podcast-episode-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:10px;background:rgba(29,185,84,.12);color:var(--accent,#1ed760)}
+@media(max-width:700px){.edit-song-dialog .edit-song-option{grid-template-columns:40px minmax(100px,1fr) 20px!important;gap:9px}.podcast-catalog-rail{display:grid;grid-auto-flow:column;grid-auto-columns:min(74vw,244px);grid-template-columns:none;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:8px}.podcast-catalog-rail>*{scroll-snap-align:start}.podcast-catalog-episodes .section-heading{flex-wrap:wrap}}
