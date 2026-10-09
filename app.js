@@ -468,7 +468,7 @@ async function hydrateArtistCovers(artists=state.artists){
  for(let i=0;i<paths.length;i+=8){
   const batch=paths.slice(i,i+8);
   await Promise.all(batch.map(async path=>{
-    try{const url=await resolveCoverUrl(path);if(url){state.coverUrls[path]=url;(artists||[]).filter(a=>a.cover_path===path).forEach(updateArtistArtwork);}}
+    try{const url=await resolveCoverUrl(path);if(url){state.coverUrls[path]=url;(artists||[]).filter(a=>a.cover_path===path).forEach(a=>{updateArtistArtwork(a);if(state.page==='artist-detail'&&Number(state.selectedArtist)===Number(a.artist_id))applyArtistBanner(a.artist_id,path,url);});}}
     catch(e){console.warn('Artist artwork unavailable:',e);}
   }));
  }
@@ -556,36 +556,55 @@ function defaultLanding(){return hasAdminAccess()?'admin-dashboard':hasArtistAcc
 // Refresh the public artist record when opening a profile. The browse catalog
 // can be older than a newly uploaded artist banner (including across accounts).
 let artistCoverRequestSequence = 0;
-async function refreshViewedArtistCover(artistId) {
-  if (!db || !artistId) return;
-  const sequence = ++artistCoverRequestSequence;
-  const response = await db.from('artist').select('artist_id,cover_path').eq('artist_id', Number(artistId)).eq('is_active', true).maybeSingle();
-  if (response.error) {
-    console.warn('Artist cover refresh failed:', response.error);
-    return;
-  }
-  if (!response.data || sequence !== artistCoverRequestSequence) return;
-  const artist = state.artists.find(item => Number(item.artist_id) === Number(artistId));
-  if (!artist) return;
-  const newPath = response.data.cover_path || null;
-  const changed = artist.cover_path !== newPath;
-  artist.cover_path = newPath;
-  if (newPath) {
-    // Refresh signed URLs when an artist is opened, but render the existing image immediately.
-    // A newly uploaded cover has a unique object path, so it does not inherit stale artwork.
-    const url = state.coverUrls[newPath] || await resolveCoverUrl(newPath);
-    if (url) { state.coverUrls[newPath] = url; updateArtistArtwork(artist); }
-  }
-  if (sequence !== artistCoverRequestSequence || state.page !== 'artist-detail' || Number(state.selectedArtist) !== Number(artistId)) return;
-  const banner = document.getElementById('artist-profile-hero');
-  const sticky = document.getElementById('artist-sticky-bar');
-  const url = newPath && state.coverUrls[newPath];
-  for (const node of [banner, sticky]) {
+// Keep an in-flight resolution per cover, so changing pages does not restart requests.
+const artistBannerLoads = new Map();
+function applyArtistBanner(artistId, path, url) {
+  if (state.page !== 'artist-detail' || Number(state.selectedArtist) !== Number(artistId)) return;
+  const artist = state.artists.find(a => Number(a.artist_id) === Number(artistId));
+  if (!artist || artist.cover_path !== path) return;
+  for (const node of [document.getElementById('artist-profile-hero'), document.getElementById('artist-sticky-bar')]) {
     if (!node) continue;
     if (url) node.style.setProperty('--artist-cover', `url("${url.replaceAll('"', '%22')}")`);
     else node.style.removeProperty('--artist-cover');
   }
 }
+function preloadArtistBanner(path, url) {
+  if (artistBannerLoads.has(url)) return artistBannerLoads.get(url);
+  const promise = new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+  artistBannerLoads.set(url, promise);
+  return promise;
+}
+async function refreshViewedArtistCover(artistId) {
+  if (!db || !artistId) return;
+  const sequence = ++artistCoverRequestSequence;
+  const artist = state.artists.find(a => Number(a.artist_id) === Number(artistId));
+  if (!artist) return;
+  // Show the cached cover at once; never wait for another database request.
+  if (artist.cover_path && state.coverUrls[artist.cover_path])
+    applyArtistBanner(artistId, artist.cover_path, state.coverUrls[artist.cover_path]);
+  try {
+    const response = await db.from('artist').select('artist_id,cover_path').eq('artist_id', Number(artistId)).eq('is_active', true).maybeSingle();
+    if (response.error || !response.data || sequence !== artistCoverRequestSequence) return;
+    const path = response.data.cover_path || null;
+    artist.cover_path = path;
+    if (!path) { applyArtistBanner(artistId, path, null); return; }
+    // Existing signed URLs can expire or be stale. Verify once and renew only on failure.
+    let url = state.coverUrls[path] || await resolveCoverUrl(path);
+    if (!url || !(await preloadArtistBanner(path, url))) {
+      delete state.coverUrls[path];
+      url = await resolveCoverUrl(path);
+      if (!url || !(await preloadArtistBanner(path, url))) return;
+    }
+    state.coverUrls[path] = url;
+    if (sequence === artistCoverRequestSequence) applyArtistBanner(artistId, path, url);
+  } catch (error) { console.warn('Artist banner unavailable:', error); }
+}
+
 function navigate(page, extras = {}) {
   closeKaraokeSearchOverlay();
   if (!pageAllowed(page)) return toast('This page is not available for your account.', true);
@@ -598,8 +617,8 @@ function navigate(page, extras = {}) {
   if (page === 'top-songs') void refreshPersonalTopSongs();
   if (page === 'artist-detail') {
     const viewed=state.artists.find(a=>Number(a.artist_id)===Number(state.selectedArtist));
-    if(viewed?.cover_path&&state.coverUrls[viewed.cover_path]) updateArtistArtwork(viewed);
-    else void refreshViewedArtistCover(state.selectedArtist);
+    if(viewed?.cover_path&&state.coverUrls[viewed.cover_path]) applyArtistBanner(state.selectedArtist, viewed.cover_path, state.coverUrls[viewed.cover_path]);
+    void refreshViewedArtistCover(state.selectedArtist);
   }
   const main = document.getElementById('main-content'); if (main) main.scrollTop = 0;
   if (page === 'artist-detail' && state.selectedArtist) {
@@ -611,6 +630,8 @@ function navigate(page, extras = {}) {
         const main = document.getElementById('main-content');
         const previousScroll = main?.scrollTop || 0;
         render();
+        const currentArtist = state.artists.find(a => Number(a.artist_id) === openedArtist);
+        if (currentArtist?.cover_path && state.coverUrls[currentArtist.cover_path]) applyArtistBanner(openedArtist, currentArtist.cover_path, state.coverUrls[currentArtist.cover_path]);
         const updatedMain = document.getElementById('main-content');
         if (updatedMain) updatedMain.scrollTop = previousScroll;
       }
