@@ -5423,3 +5423,14 @@ body[data-page="artist-detail"] .artist-profile-hero{background-image:linear-gra
 .sw-person-playlist-art img,.sw-person-playlist-placeholder{height:100%;width:100%;object-fit:cover;display:grid;place-items:center}
 .sw-person-playlist-actions{margin:14px 0}
 @media(max-width:700px){.sw-person-playlist-grid{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 4px 12px;overscroll-behavior-x:contain}.sw-person-playlist-card{flex:0 0 min(64vw,220px);scroll-snap-align:start}}
+
+/* Following/follower navigation is a full-row tap target on mobile and desktop. */
+.social-list .sw-follower-link{display:flex;align-items:center;gap:12px;min-width:0;width:100%;text-align:left;cursor:pointer;background:transparent;border:0;color:inherit;padding:7px 0;}
+.social-list .sw-follower-link:hover strong,.social-list .social-link:hover strong{text-decoration:underline;text-underline-offset:3px;}
+.social-list .sw-follower-link:focus-visible{outline:2px solid #a78bfa;outline-offset:3px;border-radius:8px;}
+.social-list .sw-follower-link > span:last-child{min-width:0;display:flex;flex-direction:column;gap:3px;}
+
+/* Social follower/following thumbnails use shared public profile photos. */
+.social-list .sw-social-avatar{width:38px;height:38px;min-width:38px;flex:0 0 38px;display:grid;place-items:center;position:relative;overflow:hidden;border-radius:50%;line-height:1}
+.social-list .sw-social-avatar img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;min-width:0;min-height:0;border-radius:50%}
+.social-list .sw-social-avatar .sw-social-initial,.social-list .sw-social-avatar .artist-initial{display:grid;place-items:center;width:100%;height:100%}
