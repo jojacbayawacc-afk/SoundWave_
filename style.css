@@ -5339,46 +5339,40 @@ body{accent-color:#8B5CF6}
 }
 @media (max-width:380px){:root{--sw-mobile-rail-width:min(79vw,248px)}}
 
-/* Artist search/results artwork — shared across top-result and artist cards */
-.artist-round,.top-art.round {position:relative;overflow:hidden;isolation:isolate}
-.artist-search-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1}
-.artist-round .hover-play{position:absolute;z-index:2}
-.top-art.round .artist-search-photo{border-radius:inherit}
+/* Artist avatar uses account profile photo; artist cover_path remains the full-width banner. */
+.artist-profile-avatar,.artist-sticky-avatar,.artist-round,.top-result-avatar{overflow:hidden!important;position:relative}
+.artist-avatar-photo,.artist-profile-avatar>img,.artist-sticky-avatar>img,.artist-round>img{width:100%!important;height:100%!important;display:block!important;object-fit:cover!important;object-position:center!important;border-radius:inherit!important}
+body[data-page="artist-detail"] .artist-profile-hero{background-image:linear-gradient(0deg,rgba(16,13,31,.87),rgba(16,13,31,.15) 78%),var(--artist-cover,linear-gradient(135deg,#3b2b6a,#151324))!important;background-size:cover!important;background-position:center!important}
 
-/* Top-right profile photo: consistently crop inside the circular avatar. */
-.app-top .profile-wrap #profile-toggle.top-avatar {
-  position: relative;
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  max-width: 40px;
-  max-height: 40px;
-  padding: 2px;
-  border: 2px solid #8B5CF6;
-  border-radius: 50%;
-  overflow: hidden;
-  isolation: isolate;
-  line-height: 1;
-  vertical-align: middle;
-  background: #211537;
+/* Artist avatar in Library: same photo source as Search and artist profile. */
+.library-artist-photo{display:grid;place-items:center;overflow:hidden;border-radius:50%;position:relative;flex-shrink:0}
+.library-artist-photo img.artist-avatar-photo,.library-artist-photo img[data-artist-photo]{display:block;width:100%;height:100%;min-width:0;min-height:0;object-fit:cover;object-position:center;border-radius:50%}
+.library-artist-photo .artist-initial{display:grid;place-items:center;width:100%;height:100%;font-weight:800}
+
+/* People discovery: compact profiles in Midnight Violet */
+.sw-people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:12px;margin:16px 0 28px}
+.sw-person-card{min-width:0;display:flex;align-items:center;gap:10px;padding:13px;background:#20182f;border:1px solid #493467;border-radius:14px}
+.sw-person-main{display:flex;align-items:center;gap:12px;min-width:0;flex:1;background:none;border:0;color:inherit;text-align:left;cursor:pointer}
+.sw-person-avatar{display:grid;place-items:center;flex:0 0 52px;width:52px;height:52px;border-radius:50%;background:#65469f;overflow:hidden;color:#fff;font-weight:800}
+.sw-person-avatar img{width:100%;height:100%;object-fit:cover;object-position:center}
+.sw-person-info{display:flex;flex-direction:column;min-width:0;gap:4px}.sw-person-info strong,.sw-person-info small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sw-person-info small{color:#c6b5df;font-size:12px}
+.sw-person-card .button{flex:0 0 auto}
+.sw-public-person{padding:20px 22px 36px}.sw-public-person-cover{height:170px;padding:20px;border-radius:16px;background:linear-gradient(125deg,#49337e,#191326);border:1px solid #4c386c}
+.sw-public-person-identity{margin-top:-38px;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}.sw-public-person-identity .sw-person-avatar{width:100px;height:100px;flex-basis:100px;border:5px solid #161023}.sw-public-person-identity h1{margin:0;font-size:clamp(23px,4vw,36px)}.sw-public-person-identity p{color:#c6b5df;margin:4px 0}.sw-public-person-identity .button{margin-left:auto}
+@media(max-width:700px){.sw-people-grid{grid-template-columns:1fr}.sw-person-card{padding:10px}.sw-public-person{padding:12px}.sw-public-person-cover{height:140px}.sw-public-person-identity .sw-person-avatar{width:76px;height:76px;flex-basis:76px}.sw-public-person-identity{gap:10px}}
+
+/* Keep Discover accessible from every account role, including Listener. */
+.app-top .top-actions .top-listen-btn{
+  display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+  border:1px solid #7453B9!important;background:#241936!important;
+  color:#D7C9FF!important;box-shadow:none!important;flex-shrink:0;
 }
-.app-top .profile-wrap #profile-toggle.top-avatar > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  max-width: 100%;
-  max-height: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  object-fit: cover;
-  object-position: center center;
-  transform: none;
-  flex-shrink: 0;
+.app-top .top-actions .top-listen-btn:hover,
+.app-top .top-actions .top-listen-btn:focus-visible{
+  background:#392457!important;border-color:#9B77F9!important;
+  color:#FFFFFF!important;outline-offset:2px;
+}
+@media(max-width:700px){
+ .app-top .top-actions .top-listen-btn{width:36px!important;min-width:36px!important;padding:0!important}
+ .app-top .top-actions .top-listen-btn span{display:none!important}
 }
