@@ -4845,3 +4845,42 @@ body.karaoke-mode .custom-playbar .player-main-play{width:44px;height:44px}
   .mobile-now-pill{flex:1;min-width:0}
   .mobile-now-lyrics,.mobile-now-queue{inset:72px 16px 188px}
 }
+
+
+/* 2026-10-09: mobile controls minimal; desktop transport layout unchanged */
+@media (max-width:900px){
+  .mobile-now-playing .mobile-now-actions{margin-top:10px!important;display:flex!important;justify-content:center!important;align-items:center!important;gap:22px!important;padding:0 0 max(12px,env(safe-area-inset-bottom,0px))!important}
+  .mobile-now-icon-action{appearance:none;display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border:0;border-radius:50%;background:transparent;color:rgba(255,255,255,.72);cursor:pointer;transition:color .14s ease,background-color .14s ease}
+  .mobile-now-icon-action svg{width:22px;height:22px}
+  .mobile-now-icon-action:active,.mobile-now-icon-action[aria-pressed=true]{color:#fff;background:rgba(255,255,255,.12)}
+  .mobile-now-icon-action:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .mobile-now-playing .mobile-now-lyrics,.mobile-now-playing .mobile-now-queue{inset:72px 14px 225px!important;padding:16px!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;background:rgba(9,13,13,.98)!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:16px!important}
+  .mobile-now-playing.show-lyrics .mobile-now-controls,.mobile-now-playing.show-queue .mobile-now-controls,
+  .mobile-now-playing.show-lyrics .mobile-now-actions,.mobile-now-playing.show-queue .mobile-now-actions{opacity:1!important;position:relative!important;z-index:9!important}
+  .mobile-queue-row{padding:8px 10px!important;gap:10px!important;min-height:62px!important;border-radius:11px!important}
+  .mobile-queue-row.current{background:rgba(255,255,255,.065)!important;border-color:rgba(255,255,255,.13)!important}
+  .mobile-queue-art{width:42px!important;height:42px!important;flex-basis:42px!important;border-radius:8px!important}
+  .mobile-queue-copy strong{font-size:13px}
+  .mobile-queue-copy span{font-size:12px}
+  .mobile-queue-copy small{font-size:11px}
+  .mobile-queue-group + .mobile-queue-group{margin-top:14px}
+}
+@media(min-width:901px){
+  body.karaoke-mode .workspace{grid-template-columns:minmax(0,270px) minmax(0,1fr) minmax(260px,287px)!important;align-items:start!important}
+  body.karaoke-mode .workspace:has(.library-collapsed){grid-template-columns:79px minmax(0,1fr) 287px!important}
+  body.karaoke-mode.rail-hidden .workspace{grid-template-columns:270px minmax(0,1fr)!important}
+  body.karaoke-mode.rail-hidden .workspace:has(.library-collapsed){grid-template-columns:79px minmax(0,1fr)!important}
+  body.karaoke-mode .workspace>.sidebar{display:flex!important;min-width:0!important;width:100%!important}
+  body.karaoke-mode .workspace>.context-rail{display:block!important;min-width:0!important;width:100%!important;max-width:100%!important;overflow-x:hidden!important;overflow-y:auto!important;box-sizing:border-box!important;visibility:visible!important}
+  body.karaoke-mode.rail-hidden .workspace>.context-rail{display:none!important}
+  body.karaoke-mode .workspace>.main{min-width:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow-x:hidden!important}
+  body.karaoke-mode .karaoke-panel{box-sizing:border-box!important;max-width:100%!important;width:100%!important;margin:0!important;border-radius:12px!important}
+  body.karaoke-mode .context-rail .rail-title{display:flex!important;width:100%!important;align-items:center!important}
+  body.karaoke-mode .context-rail .queue-block{display:block!important;max-width:100%!important;width:100%!important}
+  body.karaoke-mode .context-rail .queue-row{display:flex!important;width:100%!important;box-sizing:border-box!important;align-items:center!important}
+  body.karaoke-mode .context-rail .queue-art{flex:0 0 44px!important;min-width:44px!important}
+  body.karaoke-mode .context-rail .queue-text{flex:1 1 auto!important;min-width:0!important;display:flex!important}
+  body.karaoke-mode .context-rail .queue-text strong,
+  body.karaoke-mode .context-rail .queue-text small{display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+}
+@media(prefers-reduced-motion:reduce){.mobile-now-icon-action{transition:none!important}}
