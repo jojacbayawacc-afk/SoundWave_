@@ -5411,3 +5411,15 @@ body[data-page="artist-detail"] .artist-profile-hero{background-image:linear-gra
  body[data-page="admin"] .admin-album-detail .admin-song-manager>.admin-song-card>.button{min-height:38px!important;}
  body[data-page="admin"] .admin-album-detail .admin-song-manager>.empty{flex:1 0 100%!important;}
 }
+
+/* Public playlists shown in discoverable People profiles */
+.sw-person-playlists{margin:24px 0 36px;padding:0 4px;min-width:0}
+.sw-person-playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-top:16px}
+.sw-person-playlist-card{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:8px;padding:12px;background:#241c35;border:1px solid #4b3c66;border-radius:14px;color:inherit;cursor:pointer;min-width:0}
+.sw-person-playlist-card:hover{background:#312541;border-color:#8b5cf6}
+.sw-person-playlist-card strong{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.sw-person-playlist-card small{color:#c4b5fd}
+.sw-person-playlist-art{width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:10px;display:grid;place-items:center}
+.sw-person-playlist-art img,.sw-person-playlist-placeholder{height:100%;width:100%;object-fit:cover;display:grid;place-items:center}
+.sw-person-playlist-actions{margin:14px 0}
+@media(max-width:700px){.sw-person-playlist-grid{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 4px 12px;overscroll-behavior-x:contain}.sw-person-playlist-card{flex:0 0 min(64vw,220px);scroll-snap-align:start}}
