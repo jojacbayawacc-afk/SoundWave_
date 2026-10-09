@@ -4964,3 +4964,62 @@ body{background:#100D1F;color:#F8F7FF}
 .oauth-artist-name[hidden]{display:none!important}
 @media(max-width:700px){.auth-wrap.auth-v28{display:flex!important;flex-direction:column!important;min-height:100dvh}.auth-v28 .auth-show{min-height:115px!important;padding:22px 20px!important;flex:0 0 auto!important}.auth-v28 .auth-show h1{font-size:clamp(24px,6vw,34px)!important;line-height:1.07!important;letter-spacing:-1px!important}.auth-v28 .auth-panel{padding:14px 14px 30px!important;display:block!important}.auth-v28 .auth-box{margin:0 auto!important;border-radius:20px!important;padding:20px 17px!important;box-shadow:none!important}.auth-v28 .auth-mobile-heading h2{font-size:26px!important}.oauth-role-choice label{min-width:0}.auth-v28 .auth-email-shell{max-width:100%;overflow:visible}}
 @media(prefers-reduced-motion:reduce){.auth-v28 *,.sidebar *{animation:none!important;transition:none!important}}
+
+/* Midnight Violet completion: accents and controls */
+:root{--sp-green:#8B5CF6;--accent:#8B5CF6;--green:#8B5CF6;--lime:#8B5CF6;--sp-primary:#8B5CF6}
+::selection{background:#8B5CF6;color:#F8F7FF}
+.brand-icon,.auth-v28 .brand-icon{background:#8B5CF6!important;color:#100D1F!important;box-shadow:none!important;animation:none!important}
+.auth-v28 .auth-show h1,.auth-v28 .auth-box h2{background:none!important;color:#F8F7FF!important;-webkit-text-fill-color:#F8F7FF!important;animation:none!important}
+.auth-v28 .auth-show .eyebrow,.auth-v28 .auth-box .eyebrow,.auth-v28 .field:focus-within label{color:#C4B5FD!important}
+.auth-v28 .auth-show::before,.auth-v28 .auth-show::after{animation:none!important}
+.auth-v28 .auth-box::before{background:none!important;border:0!important;box-shadow:none!important}
+.auth-v28 .auth-box{box-shadow:none!important}
+.auth-v28 .button,.auth-v28 .field input,.auth-v28 .field select{transition:background-color .15s ease,border-color .15s ease!important}
+.auth-v28 .auth-panel::before,.auth-v28 .auth-panel::after{display:none!important}
+.auth-v28 .auth-show .brand-icon{background:#8B5CF6!important}
+.auth-v28 .auth-google-mark{color:#241537!important}
+.auth-v28 .auth-email-submit,.auth-v28 .button:not(.secondary){background:#8B5CF6!important;color:#100D1F!important}
+.auth-v28 .auth-box .field input:focus,.auth-v28 .auth-box .field select:focus{background:#1C1530!important;border-color:#8B5CF6!important;box-shadow:0 0 0 2px #8B5CF62b!important}
+.auth-v28 .auth-show-note{color:#C4B5FD!important}
+.auth-v28 .auth-show>*,.auth-v28 .auth-box>*{animation:none!important}
+/* Buttons, playing indicators and focus styling not yet covered by older rules */
+.sw-big-play,.sw-big-play:hover,.player-main-play:focus-visible,.hover-play,.button:not(.secondary):not(.danger){background-color:#8B5CF6!important}
+input[type=range],input[type=checkbox],input[type=radio]{accent-color:#8B5CF6}
+.pin-ico,.library-pin-row.is-pinned .library-pin-action,.sidebar .library-item.active strong{color:#C4B5FD!important}
+.sidebar .library-item.active{border-color:#51396f!important;box-shadow:inset 3px 0 0 #8B5CF6!important}
+.library-pin-action{opacity:.85!important;visibility:visible!important;transition:none!important;color:#C4B5FD!important;background:#241B35!important;cursor:pointer}
+.library-pin-action:hover,.library-pin-action:focus-visible{opacity:1!important;background:#38274f!important;color:#F8F7FF!important}
+.library-pin-row:not(.is-pinned) .library-pin-action{color:#9886B2!important;background:#1e192d!important}
+.library-pin-row,.library-pin-row .library-item{animation:none!important;transform:none!important;filter:none!important}
+/* Compact vertically centered auth page without tall empty bottom column. */
+@media(max-width:700px){
+ html,body,#app{min-height:100%;}
+ .auth-wrap.auth-v28{min-height:100dvh!important;height:auto!important;display:flex!important;flex-direction:column!important;justify-content:flex-start!important;overflow-x:hidden!important;}
+ .auth-v28 .auth-show{flex:0 0 auto!important;min-height:0!important;height:auto!important;padding:16px 20px 11px!important;gap:8px!important;justify-content:flex-start!important;}
+ .auth-v28 .auth-show h1{font-size:clamp(22px,6vw,29px)!important;line-height:1.12!important;margin:6px 0!important;letter-spacing:-.8px!important}
+ .auth-v28 .auth-show p{font-size:12px!important;line-height:1.45!important;margin:3px 0!important}
+ .auth-v28 .auth-show .brand{margin:0 0 4px!important;padding:0!important}
+ .auth-v28 .auth-show-note,.auth-v28 .auth-show .eyebrow{display:none!important}
+ .auth-v28 .auth-panel{flex:1 0 auto!important;min-height:0!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;padding:9px 15px 20px!important;}
+ .auth-v28 .auth-box{width:100%!important;max-width:440px!important;margin:0!important;padding:18px 16px!important;border-radius:18px!important}
+ .auth-v28 .auth-mobile-heading h2{font-size:23px!important;line-height:1.15!important}
+ .auth-v28 .auth-mobile-heading p{margin:6px 0 12px!important}
+ .auth-v28 .auth-legal{font-size:11px!important;margin-top:12px!important}
+ .auth-v28 .auth-separator{margin:10px 0!important}
+ .auth-v28 .auth-email-shell:not(.open){display:none!important}
+ .library-pin-action{width:32px!important;height:32px!important;right:5px!important}
+}
+
+/* Auth: one shared registration role selector for Google and email */
+.auth-v28 .oauth-role-choice{border:0;min-width:0;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.auth-v28 .oauth-role-choice legend{float:left;width:100%;font-weight:700;font-size:12px;color:#C4B5FD;margin-bottom:10px}
+.auth-v28 .oauth-role-choice label{min-width:0;min-height:43px;padding:10px 14px;justify-content:center;background:#211537;border:1px solid #493461;border-radius:12px}
+.auth-v28 .oauth-role-choice label:has(input:checked){background:#352257;border-color:#8B5CF6;color:#F8F7FF}
+.auth-v28 .oauth-role-choice input{accent-color:#8B5CF6}
+.auth-v28 .oauth-artist-name[hidden]{display:none!important}
+.auth-v28 .oauth-artist-name{display:flex;flex-direction:column;gap:6px;margin:0 0 14px;color:#F8F7FF}
+.auth-v28 .oauth-artist-name label{font-size:12px;color:#C4B5FD;font-weight:700}
+.auth-v28 .oauth-artist-name input{width:100%;min-height:44px;border-radius:11px;border:1px solid #493461;background:#211537;color:#F8F7FF;padding:10px 13px;box-sizing:border-box}
+.auth-v28 .oauth-artist-name input:focus{outline:2px solid #8B5CF6;outline-offset:1px}
+.auth-v28 .auth-separator{display:none!important}
+@media(max-width:700px){.auth-v28 .oauth-role-choice{gap:8px}.auth-v28 .oauth-role-choice label{font-size:13px}}
