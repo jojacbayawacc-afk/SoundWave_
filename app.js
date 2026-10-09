@@ -733,6 +733,9 @@ function shell(content, title, desc) {
 ${addToPlaylistDialog()}`;
   const main = document.getElementById('main-content'); if (keep) main.scrollTop = keep;
   bindShared(); bindMusic(); bindRail(); bindLibrary(); renderIdlePlayer();
+  // Rebuild karaoke after any necessary shell redraw (for example, saved
+  // preferences or other library changes), rather than leaving an empty page.
+  if (state.karaokeMode && state.player?.kind === 'song') void syncKaraokePanel();
   const g = $('#global-search');
   if (g) {
     g.addEventListener('input', () => setSearch(g.value, g));
@@ -749,7 +752,17 @@ ${addToPlaylistDialog()}`;
     requestAnimationFrame(() => document.getElementById(btn.dataset.clearSearch)?.focus());
   }));
   if (state.focusSearch) { const el = document.getElementById(state.focusSearch); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} } state.focusSearch = null; }
-  $('#library-toggle')?.addEventListener('click', () => { state.libraryExpanded = !state.libraryExpanded; render(); });
+  $('#library-toggle')?.addEventListener('click', () => {
+    state.libraryExpanded = !state.libraryExpanded;
+    // Collapse the library without recreating the entire app shell. Recreating
+    // #main-content discards the currently displayed karaoke lyrics.
+    const sidebar = document.querySelector('.workspace > .sidebar');
+    if (!sidebar) { render(); return; }
+    sidebar.classList.toggle('library-collapsed', !state.libraryExpanded);
+    const toggle = document.getElementById('library-toggle');
+    toggle?.setAttribute('aria-expanded', String(state.libraryExpanded));
+    if (toggle) toggle.title = `${state.libraryExpanded ? 'Collapse' : 'Expand'} your library`;
+  });
   $('#nav-back')?.addEventListener('click', goBack); $('#nav-forward')?.addEventListener('click', goForward);
   $('#profile-toggle')?.addEventListener('click', (e) => { e.stopPropagation(); const m = $('#profile-menu'); m.hidden = !m.hidden; });
   $('#profile-signout')?.addEventListener('click', () => action(async () => { await stopAudio(); cleanupSessionRuntime(); document.getElementById('soundwave-player')?.remove(); check(await db.auth.signOut()); }));
@@ -3154,7 +3167,7 @@ function queueRow(item, idx) {
 }
 function railHtml() {
   const p = state.player, tab = state.railTab === 'lyrics' ? 'now' : state.railTab;
-  const head = `<div class="rail-title"><h2>${tab === 'queue' ? 'Queue' : tab === 'lyrics' ? 'Lyrics' : 'Now playing'}</h2><div class="rail-tools"><button type="button" class="icon-quiet ${tab === 'queue' ? 'active' : ''}" data-rail-tab="queue" aria-label="Show queue" title="Queue">${icon('queue')}</button><button type="button" id="close-rail" class="icon-quiet" aria-label="Hide this panel" title="Hide">${icon('close')}</button></div></div>`;
+  const head = `<div class="rail-title"><h2>${tab === 'queue' ? 'Queue' : tab === 'lyrics' ? 'Lyrics' : 'Now playing'}</h2><div class="rail-tools"><button type="button" id="close-rail" class="icon-quiet" aria-label="Hide this panel" title="Hide">${icon('close')}</button></div></div>`;
   if (!p) return `${head}<div class="now-card empty-now"><span class="now-art placeholder">${icon('music')}</span><h3>Nothing playing</h3><p class="muted">Pick a song and its details will show up here.</p></div>${friendNowHtml()}${friendActivityHtml()}`;
   const song = p.kind === 'song' ? songById(p.id) : null;
   const current = { song, title: p.title, artist: p.artist };
