@@ -323,6 +323,7 @@ function mergeFollowerCountsPayload(payload, target = {}) {
 }
 function followBtn(a, cls = '') {
   if (!a || isOwnArtist(a)) return '';
+  if(isOwnArtist(a))return '<span class="muted small">Your artist profile</span>';
   const on = isFollowing(a.artist_id);
   return `<button type="button" class="follow-btn ${cls} ${on ? 'on' : ''}" data-fav="${a.artist_id}" aria-pressed="${on}" aria-label="${on ? `Unfollow ${esc(a.artist_name||'artist')}` : `Follow ${esc(a.artist_name||'artist')}`}">${on ? 'Unfollow' : 'Follow'}</button>`;
 }
@@ -2398,19 +2399,69 @@ const personName = (uid) => state.socialProfiles?.[String(uid)]?.display_name ||
 const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return ''; } };
 function followerRows() {
   // People who tapped Follow on this account's artist profile (listeners cannot be followed).
-  return (state.artistFollowers || []).map((r) => ({ id: r.follower_user_id, name: r.display_name || personName(r.follower_user_id), since: r.followed_at }));
+  return (state.artistFollowers || []).map((r) => ({ id: r.follower_user_id, name: r.display_name || personName(r.follower_user_id), since: r.followed_at, photo: r.profile_photo_path || r.profile_photo_url || null }));
 }
 function myFollowerCount() { return Math.max(followerRows().length, state.artist ? (state.followerCounts?.[Number(state.artist.artist_id)] || 0) : 0); }
-const followingArtists = () => state.artists.filter((a) => isFollowing(a.artist_id));
+const followingArtists = () => state.artists.filter((a) => isFollowing(a.artist_id) && !isOwnArtist(a));
 const followNav = () => (hasArtistAccess() ? 'followers' : 'liked-artists');
 const followLabel = () => (hasArtistAccess() ? 'Followers' : 'Following');
+const followerImageRequests = new Map();
+function followerAvatar(r,i=0){
+ const key=String(r.id||'');
+ const record=state.socialProfiles?.[key]||{};
+ const url=publicProfileImageUrl(record)||publicProfileImageUrl({profile_photo_path:r.photo});
+ if(!url)void resolveFollowerImage(r);
+ return `<span class="member-avatar sw-social-avatar" data-social-avatar="${esc(key)}" style="background:${grad(i)}">${url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async">`:`<span class="sw-social-initial">${esc((r.name||'?')[0].toUpperCase())}</span>`}</span>`;
+}
+async function resolveFollowerImage(r){
+ const key=String(r.id||'');if(!key||followerImageRequests.has(key)||!state.user)return;
+ const name=String(r.name||'').trim();if(name.length<2)return;
+ const task=(async()=>{
+   try {
+     const {data,error}=await db.rpc('soundwave_search_public_people',{p_query:name.slice(0,80),p_limit:30});
+     if(error)return;
+     const person=(data||[]).find(p=>String(p.user_id)===key);
+     if(!person)return;
+     state.socialProfiles[key]={...(state.socialProfiles[key]||{}),...person};
+     const url=publicProfileImageUrl(person);if(!url)return;
+     document.querySelectorAll('[data-social-avatar]').forEach(host=>{
+       if(host.dataset.socialAvatar!==key)return;
+       host.replaceChildren();const img=document.createElement('img');img.src=url;img.alt='';img.loading='lazy';img.decoding='async';host.append(img);
+     });
+   } catch(e){console.info('Follower photo lookup unavailable',e);}
+ })();followerImageRequests.set(key,task);await task;
+}
+
+// Resolve a follower to a public People profile; never substitute another account by name.
+async function openFollowerPublicProfile(userId, displayName='') {
+ if (!userId) return;
+ if (String(userId)===String(state.user?.id)) { navigate('profile'); return; }
+ let person=[...(state.peopleResults||[])].find(p=>String(p.user_id)===String(userId));
+ const known=state.socialProfiles?.[String(userId)]||{};
+ if (!person) {
+   const term=String(known.display_name||displayName||'').trim();
+   if(term.length>=2){
+     const response=await db.rpc('soundwave_search_public_people',{p_query:term,p_limit:30});
+     if(!response.error)person=(response.data||[]).find(p=>String(p.user_id)===String(userId));
+   }
+ }
+ if(!person){toast('This person has no discoverable public profile.');return;}
+ navigate('person-detail',{selectedPerson:person});
+ void loadPublicPersonPlaylists(person.user_id);
+}
+document.addEventListener('click',event=>{
+ const link=event.target.closest?.('[data-open-follower]');
+ if(!link)return;
+ event.preventDefault();event.stopPropagation();
+ void openFollowerPublicProfile(link.dataset.openFollower,link.dataset.followerName);
+});
 function followers(){
  const isArtist=hasArtistAccess();
  const tab=!isArtist||state.page==='liked-artists'?'following':'followers';
  const fans=followerRows(),fArtists=followingArtists();
  const initial=(n,i=0)=>`<span class="member-avatar" style="background:${grad(i)}">${esc((n||'?')[0].toUpperCase())}</span>`;
- const followersList=fans.length?fans.map((r,i)=>`<div class="social-row">${initial(r.name,i)}<div><strong>${esc(r.name)}</strong><small>${r.since?`Followed you ${esc(fmtDate(r.since))}`:'Follows you'}</small></div></div>`).join(''):`<div class="empty">No followers yet. When a listener taps <b>Follow</b> on your artist page, they will show up here.</div>`;
- const followingList=fArtists.length?fArtists.map((a,i)=>`<div class="social-row"><button type="button" class="social-link" data-open-artist="${a.artist_id}"><span class="member-avatar" style="background:${grad(i)}">${esc(a.artist_name?.[0]||'A')}</span><span><strong>${esc(a.artist_name)}</strong><small>Artist${followerText(a.artist_id)?' · '+followerText(a.artist_id):''}</small></span></button>${followBtn(a,'sm')}</div>`).join(''):`<div class="empty">You are not following any artists yet. <button type="button" class="text-link" data-nav="artists">Find artists to follow</button></div>`;
+ const followersList=fans.length?fans.map((r,i)=>`<div class="social-row"><button type="button" class="social-link sw-follower-link" data-open-follower="${esc(String(r.id||''))}" data-follower-name="${esc(r.name||'')}" aria-label="View ${esc(r.name)} profile">${followerAvatar(r,i)}<span><strong>${esc(r.name)}</strong><small>${r.since?`Followed you ${esc(fmtDate(r.since))}`:'Follows you'}</small></span></button></div>`).join(''):`<div class="empty">No followers yet. When a listener taps <b>Follow</b> on your artist page, they will show up here.</div>`;
+ const followingList=fArtists.length?fArtists.map((a,i)=>`<div class="social-row"><button type="button" class="social-link" data-open-artist="${a.artist_id}"><span class="member-avatar sw-social-avatar" data-artist-photo-host="${Number(a.artist_id)}" style="background:${grad(i)}">${artistArtwork(a,'sw-social-avatar-photo')}</span><span><strong>${esc(a.artist_name)}</strong><small>Artist${followerText(a.artist_id)?' · '+followerText(a.artist_id):''}</small></span></button>${followBtn(a,'sm')}</div>`).join(''):`<div class="empty">You are not following any artists yet. <button type="button" class="text-link" data-nav="artists">Find artists to follow</button></div>`;
  const needsSql=isArtist&&tab==='followers'&&!state.socialRpc?.mine;
  const chips=isArtist?`<div class="home-chips"><button class="${tab==='followers'?'active':''}" data-nav="followers">Followers</button><button class="${tab==='following'?'active':''}" data-nav="liked-artists">Following</button></div>`:`<div class="home-chips"><button data-nav="artists">Discover</button><button class="active" data-nav="liked-artists">Following</button></div>`;
  const stats=isArtist?`<div class="social-stats"><div><strong>${fans.length}</strong><span>Followers</span></div><div><strong>${fArtists.length}</strong><span>Following</span></div></div>`:`<div class="social-stats"><div><strong>${fArtists.length}</strong><span>Following</span></div></div>`;
