@@ -5171,3 +5171,73 @@ body{accent-color:#8B5CF6}
 @media(max-width:700px){.karaoke-search-overlay{top:60px;width:calc(100vw - 20px);max-height:65dvh;padding:12px;border-radius:14px}}
 /* Intentionally preserve green data visualization traces only */
 :where(.artist-analytics,.admin-dashboard,.admin-suite,.artist-suite,.analytics-panel,.chart-card) svg.sparkline :is(polyline,path){stroke:#1ed760!important}
+
+
+/* 2026-10-09: focused navigation and dashboard finishing pass */
+:root { --sw-selected-violet:#8B5CF6; }
+@media (min-width:701px) {
+  .workspace .sidebar { box-sizing:border-box; min-height:0; overflow:hidden; }
+  .workspace .sidebar .library-scroll {
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+    padding-inline:3px; scrollbar-gutter:stable;
+  }
+  .workspace .sidebar.library-collapsed { min-width:0; padding-inline:5px; }
+  .workspace .sidebar.library-collapsed .library-scroll { width:100%; padding-inline:2px; }
+  .workspace .sidebar.library-collapsed .library-item { width:100%; min-width:0; justify-content:center; padding:6px 2px; }
+  .workspace .sidebar.library-collapsed .library-art { width:44px; height:44px; flex:0 0 44px; max-width:100%; }
+  .workspace .sidebar .library-item-label { min-width:0; flex:1; }
+}
+.sidebar :is(.library-item,.library-art,.library-entry,.library-list-item,.library-pin-row),
+.sidebar :is(.library-item,.library-art,.library-entry,.library-list-item,.library-pin-row) :is(*, *::before, *::after) {
+  animation:none!important;
+  transition:none!important;
+  transform:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+}
+.sidebar :is(.library-item,.library-pin-row,.library-entry,.library-list-item):hover,
+.sidebar :is(.library-item,.library-pin-row,.library-entry,.library-list-item):active {
+  transform:none!important; animation:none!important; filter:none!important;
+}
+.sidebar .library-item.active,.sidebar .library-item[aria-current=page] {
+  background:#29203C!important;
+  border-color:#65508C!important;
+  box-shadow:inset 3px 0 0 #8B5CF6!important;
+}
+/* The role-specific dashboard surfaces are intentionally distinct, but related. */
+.admin-dashboard :is(.admin-overview,.admin-summary-card,.admin-summary-grid > article,.admin-dashboard-stats > *,.admin-dashboard-actions > *),
+.admin-suite :is(.admin-summary-card,.metric-card,.stat-card) {
+  background:#251C38!important;
+  border:1px solid #4D3B6D!important;
+}
+.admin-dashboard :is(.admin-overview,.admin-summary-card,.admin-dashboard-actions > *) :is(.eyebrow,small) {
+  color:#CABAF5!important;
+}
+.artist-studio-hero { background:linear-gradient(120deg,#38275F,#211835 75%,#171126)!important; }
+.artist-suite :is(.stat-card,.chart-card,.metric-card,.artist-analytics-card,.analytics-card),
+.artist-analytics :is(.stat-card,.chart-card,.metric-card,.analytics-card) {
+  background:#201B35!important;
+  border:1px solid #51447D!important;
+}
+.podcast-studio-hero,
+.podcast-studio-hero--artist,
+.podcast-studio-hero--admin,
+.podcast-studio-hero--artist-admin {
+  background:linear-gradient(120deg,#233248,#292140 64%,#1A142C)!important;
+  border-color:#4A466F!important;
+}
+.podcast-catalog-rail > *,
+.podcast-studio-card,
+.podcast-episode-catalog-row,
+.podcast-studio :is(.stat-card,.metric-card,.chart-card) {
+  background:#20283C!important;
+  border-color:#465375!important;
+}
+/* Mobile dock: remove obsolete emerald interaction states without recoloring charts. */
+.mobile-dock { background:#130F24!important; border-color:#483963!important; }
+.mobile-dock button.active,.mobile-dock [aria-current=page] { color:#B79AFF!important; }
+.mobile-dock button:focus-visible { outline-color:#C4B5FD!important; }
+@media(max-width:700px) {
+  .mobile-dock { box-sizing:border-box; max-width:100vw; }
+  .mobile-dock > * { min-width:0; }
+}
