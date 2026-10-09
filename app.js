@@ -2251,14 +2251,77 @@ function peopleSearchSection(){
  if(state.peopleQueryLoaded!==String(state.searchQuery||'').trim())return '<p class="muted">Searching people…</p>';
  return state.peopleResults.length?peopleCards(state.peopleResults):'<p class="muted">No public people matched this search.</p>';
 }
+// Other users' playlists use their own read-only view, never the owner's editor.
+const publicPersonPlaylists = { ownerId:null, rows:[], loading:false, error:'', selected:null, tracks:[] };
+let publicPlaylistRequestId=0;
+async function loadPublicPersonPlaylists(userId){
+ const request=++publicPlaylistRequestId;
+ publicPersonPlaylists.ownerId=String(userId);publicPersonPlaylists.rows=[];publicPersonPlaylists.selected=null;publicPersonPlaylists.tracks=[];
+ publicPersonPlaylists.loading=true;publicPersonPlaylists.error='';
+ if(state.page==='person-detail')publicPersonProfile();
+ const result=await db.from('playlist').select('playlist_id,playlist_name,description,cover_path,visibility,is_active,user_id')
+   .eq('user_id',userId).eq('visibility','Public').eq('is_active',true).order('playlist_id',{ascending:false});
+ if(request!==publicPlaylistRequestId||String(state.selectedPerson?.user_id)!==String(userId))return;
+ publicPersonPlaylists.loading=false;
+ if(result.error){publicPersonPlaylists.error='Public playlists could not be loaded.';console.warn('Public playlists:',result.error);}
+ else publicPersonPlaylists.rows=result.data||[];
+ if(state.page==='person-detail')publicPersonProfile();
+ // Resolve cover art without delaying playlist names or interactions.
+ for(const row of publicPersonPlaylists.rows){
+  const path=row.cover_path;
+  if(!path||state.coverUrls?.[path])continue;
+  void resolveCoverUrl(path).then(url=>{
+   if(!url||request!==publicPlaylistRequestId)return;
+   state.coverUrls[path]=url;
+   if(state.page==='person-detail'&&String(state.selectedPerson?.user_id)===String(userId))publicPersonProfile();
+  }).catch(()=>{});
+ }
+}
+async function openPublicPersonPlaylist(playlistId){
+ const chosen=publicPersonPlaylists.rows.find(p=>Number(p.playlist_id)===Number(playlistId));
+ if(!chosen||chosen.visibility!=='Public'||chosen.is_active!==true)return;
+ const request=++publicPlaylistRequestId;
+ publicPersonPlaylists.selected=chosen;publicPersonPlaylists.tracks=[];publicPersonPlaylists.loading=true;
+ publicPersonPlaylists.error='';publicPersonProfile();
+ let result=await db.from('playlist_song').select('playlist_id,song_id,track_order,date_added').eq('playlist_id',chosen.playlist_id).order('track_order');
+ if(result.error&&/date_added/i.test(String(result.error.message||'')))result=await db.from('playlist_song').select('playlist_id,song_id,track_order').eq('playlist_id',chosen.playlist_id).order('track_order');
+ if(request!==publicPlaylistRequestId||state.page!=='person-detail')return;
+ publicPersonPlaylists.loading=false;
+ if(result.error){publicPersonPlaylists.error='Unable to load this playlist.';console.warn('Public playlist tracks:',result.error);}
+ else publicPersonPlaylists.tracks=result.data||[];
+ publicPersonProfile();
+}
 function publicPersonProfile(){
  const p=state.selectedPerson;
  if(!p){shell('<div class="empty-state"><h3>Profile not available</h3><p>This person may be private or inactive.</p><button class="button secondary" data-nav="music">Back to search</button></div>','People','');return;}
  const own=String(p.user_id)===String(state.user.id);
- shell(`<section class="sw-public-person"><div class="sw-public-person-cover"><span class="eyebrow">PUBLIC PROFILE</span></div><div class="sw-public-person-identity"><span class="sw-person-avatar">${personAvatar(p)}</span><div><h1>${esc(p.display_name||p.username||'SoundWave user')}</h1><p>@${esc(p.username||'listener')} · ${esc(p.account_type||'Listener')}</p></div>${personActions(p)}</div><p class="muted">Only this person's public profile details are shown. Listening history, email, and private playlists are not shared.</p>${own?'<button type="button" class="button secondary" data-nav="profile">Your profile</button>':''}</section>`,'People','Public SoundWave profile');
+ const validOwner=publicPersonPlaylists.ownerId===String(p.user_id);
+ const entries=validOwner?publicPersonPlaylists.rows:[];
+ const selected=validOwner?publicPersonPlaylists.selected:null;
+ const cards=entries.map((pl,i)=>{
+  const url=pl.cover_path&&state.coverUrls?.[pl.cover_path];
+  const art=url?`<img src="${esc(url)}" loading="lazy" alt="">`:`<span class="sw-person-playlist-placeholder" style="background:${grad(i+2)}">${icon('music')}</span>`;
+  return `<button type="button" class="sw-person-playlist-card" data-public-person-playlist="${Number(pl.playlist_id)}"><span class="sw-person-playlist-art">${art}</span><strong>${esc(pl.playlist_name)}</strong><small>Public playlist</small></button>`;
+ }).join('');
+ let section='';
+ if(selected){
+  const tracks=publicPersonPlaylists.tracks.map(r=>songById(r.song_id)).filter(Boolean);
+  const ids=tracks.map(r=>r.song_id);
+  const ownerName=esc(p.display_name||p.username||'SoundWave user');
+  section=`<section class="sw-person-playlists"><div class="section-heading"><h2>${esc(selected.playlist_name)}</h2><button class="button secondary sm" type="button" data-public-playlist-back>Back to playlists</button></div><p class="muted">Public playlist by ${ownerName} · Read-only</p>${selected.description?`<p>${esc(selected.description)}</p>`:''}${publicPersonPlaylists.loading?'<p class="muted">Loading songs…</p>':publicPersonPlaylists.error?`<p class="muted">${esc(publicPersonPlaylists.error)}</p>`:tracks.length?`<div class="sw-person-playlist-actions"><button type="button" class="button" data-play-ids="${ids.join(',')}">${icon('play')} Play all</button></div>${trackTable(tracks,{queue:ids})}`:'<p class="muted">No available songs in this playlist.</p>'}</section>`;
+ }else{
+  section=`<section class="sw-person-playlists"><div class="section-heading"><h2>Public playlists</h2></div>${validOwner&&publicPersonPlaylists.loading?'<p class="muted">Loading public playlists…</p>':validOwner&&publicPersonPlaylists.error?`<p class="muted">${esc(publicPersonPlaylists.error)}</p>`:cards?`<div class="sw-person-playlist-grid">${cards}</div>`:validOwner?'<p class="muted">No public playlists yet.</p>':'<p class="muted">Loading public playlists…</p>'}</section>`;
+ }
+ shell(`<section class="sw-public-person"><div class="sw-public-person-cover"><span class="eyebrow">PUBLIC PROFILE</span></div><div class="sw-public-person-identity"><span class="sw-person-avatar">${personAvatar(p)}</span><div><h1>${esc(p.display_name||p.username||'SoundWave user')}</h1><p>@${esc(p.username||'listener')} · ${esc(p.account_type||'Listener')}</p></div>${personActions(p)}</div><p class="muted">Only public profile details and active public playlists are shown. Listening history, email, and private playlists are not shared.</p>${own?'<button type="button" class="button secondary" data-nav="profile">Your profile</button>':''}</section>${section}`,'People','Public SoundWave profile');
 }
 document.addEventListener('click',event=>{
- const open=event.target.closest?.('[data-open-person]');if(open){event.preventDefault();const p=state.peopleResults.find(x=>String(x.user_id)===String(open.dataset.openPerson));if(p){navigate('person-detail',{selectedPerson:p});}return;}
+ const card=event.target.closest?.('[data-public-person-playlist]');
+ if(card){event.preventDefault();void openPublicPersonPlaylist(Number(card.dataset.publicPersonPlaylist));return;}
+ if(event.target.closest?.('[data-public-playlist-back]')){event.preventDefault();publicPersonPlaylists.selected=null;publicPersonPlaylists.tracks=[];publicPersonProfile();}
+});
+
+document.addEventListener('click',event=>{
+ const open=event.target.closest?.('[data-open-person]');if(open){event.preventDefault();const p=state.peopleResults.find(x=>String(x.user_id)===String(open.dataset.openPerson));if(p){navigate('person-detail',{selectedPerson:p});void loadPublicPersonPlaylists(p.user_id);}return;}
  const button=event.target.closest?.('[data-person-follow]');if(!button)return;
  event.preventDefault();event.stopPropagation();
  const target=button.dataset.personFollow;if(!target||!state.user||target===state.user.id)return;
