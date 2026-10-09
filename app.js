@@ -938,6 +938,8 @@ function bindContent(root = document) {
   root.querySelectorAll('[data-openplaylist]').forEach((b) => b.onclick = () => openPlaylist(b.dataset.openplaylist));
   root.querySelectorAll('[data-open-show]').forEach((b) => b.onclick = () => openShow(b.dataset.openShow));
   root.querySelectorAll('[data-open-artist]').forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); navigate('artist-detail', { selectedArtist: Number(b.dataset.openArtist) }); });
+  // Bind follower rows directly on every render; do not depend on bubbling document clicks.
+  root.querySelectorAll('[data-open-follower]').forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); void openFollowerPublicProfile(b.dataset.openFollower, b.dataset.followerName).catch(err => { console.warn('Follower navigation failed',err); toast('Could not open this profile. Please try again.', true); }); });
   root.querySelectorAll('[data-open-album]').forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); navigate('album-detail', { selectedAlbum: Number(b.dataset.openAlbum) }); });
   root.querySelectorAll('[data-filter]').forEach((b) => b.onclick = () => { state.uiFilter = b.dataset.filter; render(); });
   root.querySelectorAll('[data-discover-filter]').forEach((b) => b.onclick = () => { state.discoverFilter = b.dataset.discoverFilter || 'all'; render(); });
@@ -2434,27 +2436,27 @@ async function resolveFollowerImage(r){
 
 // Resolve a follower to a public People profile; never substitute another account by name.
 async function openFollowerPublicProfile(userId, displayName='') {
- if (!userId) return;
- if (String(userId)===String(state.user?.id)) { navigate('profile'); return; }
- let person=[...(state.peopleResults||[])].find(p=>String(p.user_id)===String(userId));
- const known=state.socialProfiles?.[String(userId)]||{};
- if (!person) {
-   const term=String(known.display_name||displayName||'').trim();
-   if(term.length>=2){
-     const response=await db.rpc('soundwave_search_public_people',{p_query:term,p_limit:30});
-     if(!response.error)person=(response.data||[]).find(p=>String(p.user_id)===String(userId));
+ const uid=String(userId||'').trim();
+ if(!uid){toast('Follower account identifier is unavailable.',true);return;}
+ if(uid===String(state.user?.id)){navigate('profile');return;}
+ let person=(state.peopleResults||[]).find(p=>String(p.user_id)===uid);
+ const known=state.socialProfiles?.[uid]||{};
+ // The public directory requires a search term, so try both the public name
+ // and username. Verify the UUID to avoid navigating to a different person.
+ if(!person){
+   const terms=[known.username,known.display_name,displayName].map(v=>String(v||'').trim()).filter(v=>v.length>=2&&v.length<=80);
+   for(const term of [...new Set(terms)]){
+     const {data,error}=await db.rpc('soundwave_search_public_people',{p_query:term,p_limit:30});
+     if(error){console.warn('People lookup failed',error);toast('Could not load public profile. Check People Search access.',true);return;}
+     person=(data||[]).find(p=>String(p.user_id)===uid);
+     if(person)break;
    }
  }
- if(!person){toast('This person has no discoverable public profile.');return;}
+ if(!person){toast('This follower has no searchable public profile.',true);return;}
+ state.socialProfiles[uid]={...known,...person};
  navigate('person-detail',{selectedPerson:person});
- void loadPublicPersonPlaylists(person.user_id);
+ void loadPublicPersonPlaylists(uid);
 }
-document.addEventListener('click',event=>{
- const link=event.target.closest?.('[data-open-follower]');
- if(!link)return;
- event.preventDefault();event.stopPropagation();
- void openFollowerPublicProfile(link.dataset.openFollower,link.dataset.followerName);
-});
 function followers(){
  const isArtist=hasArtistAccess();
  const tab=!isArtist||state.page==='liked-artists'?'following':'followers';
