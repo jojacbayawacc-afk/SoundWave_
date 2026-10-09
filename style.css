@@ -4719,3 +4719,63 @@ body.karaoke-mode .karaoke-panel{width:100%!important;max-width:100%!important;m
 .podcast-episode-catalog-row>div{display:flex;flex-direction:column;min-width:0;gap:3px}.podcast-episode-catalog-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.podcast-episode-catalog-row small{color:var(--muted,#a0a7a3)}
 .podcast-episode-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:10px;background:rgba(29,185,84,.12);color:var(--accent,#1ed760)}
 @media(max-width:700px){.edit-song-dialog .edit-song-option{grid-template-columns:40px minmax(100px,1fr) 20px!important;gap:9px}.podcast-catalog-rail{display:grid;grid-auto-flow:column;grid-auto-columns:min(74vw,244px);grid-template-columns:none;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:8px}.podcast-catalog-rail>*{scroll-snap-align:start}.podcast-catalog-episodes .section-heading{flex-wrap:wrap}}
+
+/* v49: Quiet sidebar selection — no animated green glow or pulse. */
+.sidebar .library-item,
+.sidebar .library-entry,
+.sidebar .library-list-item,
+.sidebar .library-art,
+.sidebar .sidebar-click-pop,
+.sidebar .library-item::before,
+.sidebar .library-item::after,
+.sidebar .library-entry::before,
+.sidebar .library-entry::after,
+.sidebar .library-list-item::before,
+.sidebar .library-list-item::after {
+  animation: none !important;
+  transform: none !important;
+  filter: none !important;
+  transition: background-color .12s ease, color .12s ease !important;
+}
+.sidebar .library-item.active,
+.sidebar .library-item[aria-current="page"],
+.sidebar .library-entry.active,
+.sidebar .library-list-item.active {
+  box-shadow: inset 3px 0 0 var(--sp-green, #1ed760) !important;
+  background: rgba(255,255,255,.045) !important;
+}
+.sidebar .library-item.active::before,
+.sidebar .library-item.active::after,
+.sidebar .library-entry.active::before,
+.sidebar .library-entry.active::after {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+/* Combined patch: curated nav arrows, restrained selection, single lyrics experience */
+.curated-slider-controls{display:flex;align-items:center;gap:8px;margin-left:auto}
+.curated-slider-controls button{display:grid;place-items:center;width:37px;height:37px;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:#222725;color:#fff;cursor:pointer;transition:background .14s ease}
+.curated-slider-controls button:hover:not(:disabled){background:#343b36}
+.curated-slider-controls button:disabled{opacity:.3;cursor:default}
+.curated-slider-controls button svg{width:18px;height:18px}
+.shelf.curated-slider{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+/* Restore clean horizontal edge-to-edge karaoke main viewport */
+body.karaoke-mode .workspace{display:block!important;padding:0!important;margin:0!important;max-width:none!important}
+body.karaoke-mode .workspace>.sidebar,body.karaoke-mode .workspace>.context-rail{display:none!important}
+body.karaoke-mode .workspace>.main{display:block!important;width:100%!important;max-width:none!important;margin:0!important;border-radius:0!important;padding:0!important;overflow-y:auto!important}
+body.karaoke-mode .karaoke-panel{box-sizing:border-box;min-height:100%;width:100%!important;max-width:none!important;margin:0!important;align-items:stretch!important;text-align:left!important;padding:clamp(25px,5vw,70px) clamp(22px,8vw,140px)!important;gap:26px!important;background:linear-gradient(155deg,rgba(85,35,40,.84),#191b1a 80%)}
+.karaoke-heading{display:flex;flex-wrap:wrap;align-items:center;gap:12px 25px}
+.karaoke-heading h2{flex:1;min-width:180px;font-size:clamp(24px,3vw,40px);margin:0}
+.karaoke-kicker{width:100%;font-size:11px;font-weight:800;letter-spacing:.16em;color:rgba(255,255,255,.7)}
+.karaoke-exit{border:1px solid rgba(255,255,255,.25);border-radius:24px;background:rgba(255,255,255,.07);color:#fff;padding:9px 15px;cursor:pointer}
+.karaoke-lines{white-space:pre-line;font-weight:700;font-size:clamp(23px,3.5vw,46px);line-height:1.65;color:rgba(255,255,255,.85);max-width:1000px}
+.karaoke-lines.karaoke-empty{font-size:clamp(18px,2.4vw,28px);font-weight:500;opacity:.85;padding:32px 0}
+/* Mobile lyrics: compact empty state, keep audio controls visible */
+@media(max-width:700px){
+  .mobile-now-lyrics{inset:70px 16px auto!important;max-height:min(45dvh,360px)!important;min-height:0!important;padding:20px!important;border-radius:16px!important}
+  .mobile-now-playing.show-lyrics .mobile-now-art{visibility:visible!important;opacity:.2!important}
+  .mobile-now-playing.show-lyrics .mobile-now-controls{position:relative!important;z-index:9!important}
+  .karaoke-panel{padding:20px!important}
+  .curated-slider-controls button{width:33px;height:33px}
+}
+@media(prefers-reduced-motion:reduce){.curated-slider-controls button{transition:none!important}}
