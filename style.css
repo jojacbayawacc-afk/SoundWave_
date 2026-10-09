@@ -4779,3 +4779,35 @@ body.karaoke-mode .karaoke-panel{box-sizing:border-box;min-height:100%;width:100
   .curated-slider-controls button{width:33px;height:33px}
 }
 @media(prefers-reduced-motion:reduce){.curated-slider-controls button{transition:none!important}}
+
+
+/* 2026-10-09: karaoke transport refinement */
+.play-controls .transport-side-action{margin-left:2px}
+.player-right{gap:10px}
+body.karaoke-mode .context-rail .rail-title h2{font-size:18px}
+body.karaoke-mode .karaoke-panel{background:linear-gradient(180deg,#195f2f 0%,#134a25 100%)!important;color:#f1f7f1!important;padding:clamp(28px,4vw,52px) clamp(28px,6vw,74px)!important;gap:22px!important}
+body.karaoke-mode .karaoke-heading{display:flex!important;flex-direction:column;align-items:flex-start;gap:6px;margin:0 0 10px 0}
+body.karaoke-mode .karaoke-kicker{width:auto!important;font-size:11px!important;letter-spacing:.14em!important;opacity:.72!important}
+body.karaoke-mode .karaoke-heading h2{font-size:clamp(18px,2vw,26px)!important;line-height:1.2!important;color:rgba(255,255,255,.78)!important}
+body.karaoke-mode .karaoke-subtitle{font-size:14px;color:rgba(255,255,255,.62)}
+body.karaoke-mode .karaoke-lines{max-width:980px!important;font-size:clamp(30px,4.1vw,58px)!important;line-height:1.35!important;font-weight:800!important;color:rgba(255,255,255,.55)!important}
+body.karaoke-mode .karaoke-lines.karaoke-empty{font-size:clamp(18px,2.2vw,28px)!important;line-height:1.6!important;color:rgba(255,255,255,.85)!important;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.08);padding:20px 22px;border-radius:20px;max-width:640px}
+body.karaoke-mode .custom-playbar .play-controls{gap:12px}
+body.karaoke-mode .custom-playbar .player-main-play{width:44px;height:44px}
+@media(max-width:700px){
+  .play-controls .transport-side-action{display:none!important}
+  body.karaoke-mode .karaoke-panel{padding:20px 18px 28px!important;background:linear-gradient(180deg,#6c2828 0%,#311414 58%,#151313 100%)!important}
+  body.karaoke-mode .karaoke-heading{display:none!important}
+  body.karaoke-mode .karaoke-lines{font-size:clamp(18px,6.6vw,34px)!important;line-height:1.5!important;color:#fff!important;text-align:center!important}
+}
+
+/* Curated for You: hide the redundant scrollbar, retain swipe/trackpad and arrow navigation. */
+.shelf.curated-slider {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.shelf.curated-slider::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
