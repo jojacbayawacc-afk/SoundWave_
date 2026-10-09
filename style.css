@@ -5045,3 +5045,112 @@ button.button:not(.secondary):not(.danger),.button.primary,.button.primary:hover
 .admin-overview button:hover,.admin-summary-card .button,.admin-dashboard .button,.artist-studio-hero .button,.podcast-studio-hero .button{border-color:#584079!important}
 .admin-suite .eyebrow,.artist-suite .eyebrow,.admin-summary-card .eyebrow,.artist-studio-hero .eyebrow,.admin-overview .eyebrow,.admin-panel .eyebrow{color:#C4B5FD!important}
 /* preserve original green SVG chart traces and bar / sparkline charts */
+
+/* Midnight Violet dashboard surfaces — targeted, no data or chart changes */
+.workspace-hero.admin-hero,
+.workspace-hero.artist-hero {
+  background:linear-gradient(125deg,#31204d 0%,#241735 58%,#171124 100%)!important;
+  border:1px solid #4a356b!important;
+  background-size:100% 100%!important;
+  animation:none!important;
+}
+.workspace-hero.admin-hero .eyebrow,
+.workspace-hero.artist-hero .eyebrow,
+.admin-summary-grid .eyebrow,
+.artist-analytics .eyebrow {color:#C4B5FD!important}
+.admin-summary-grid > article,
+.admin-summary-card,
+.admin-overview > button,
+.artist-analytics,
+.artist-analytics-grid > .analytics-chart,
+.artist-analytics-grid > .top-listeners,
+.artist-analytics-grid > .royalty-calc,
+.artist-analytics-grid > div {
+  background:#20182f!important;
+  border-color:#45335f!important;
+  box-shadow:none!important;
+}
+.admin-summary-grid > article:hover,
+.admin-overview > button:hover,
+.artist-analytics-grid > div:hover {background:#261c39!important;border-color:#59417e!important;box-shadow:none!important;transform:none!important}
+.admin-summary-card .button.secondary,
+.admin-summary-grid .button.secondary {background:#35234f!important;color:#F8F7FF!important;border-color:#584079!important}
+.admin-summary-card .button.secondary:hover,
+.admin-summary-grid .button.secondary:hover {background:#493069!important}
+.artist-analytics .top-listeners .member-avatar{background:#392653!important;color:#D9C9FF!important}
+/* Preserve green in actual plot traces — do not recolor polyline/path/bar SVG data */
+.artist-analytics .sparkline polyline{stroke:#1ed760!important}
+/* Static Library interactions: pinned items do not glow, shift, bounce or animate. */
+.sidebar .library-pin-row,
+.sidebar .library-pin-row *,
+.sidebar .library-item,
+.sidebar .library-item *,
+.sidebar .sidebar-click-pop,
+.sidebar .library-item.active {
+  animation:none!important;
+  transition:none!important;
+  transform:none!important;
+  filter:none!important;
+  text-shadow:none!important;
+}
+.sidebar .library-pin-row.is-pinned .library-item:not(.active),
+.sidebar .library-item:not(.active),
+.sidebar .library-pin-row:not(.is-pinned) .library-item:not(.active) {
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.sidebar .library-pin-row .library-item.active,
+.sidebar .library-item.active {
+  background:#271d39!important;
+  border:1px solid #4d3a69!important;
+  box-shadow:inset 3px 0 0 #8B5CF6!important;
+}
+.sidebar .library-item:hover:not(.active){background:#221a30!important}
+.sidebar .library-item:active,
+.sidebar .library-pin-row:active,
+.sidebar .library-pin-row.is-pinned:active,
+.sidebar .library-item:focus:not(:focus-visible){transform:none!important;filter:none!important;animation:none!important}
+
+
+/* MIDNIGHT VIOLET — scoped UI-wide final accent pass.
+   Preserve chart green independently, and retain semantic error/danger statuses. */
+:root{--lime:#8B5CF6;--sp-green:#8B5CF6;--sw-green:#8B5CF6;--accent:#8B5CF6;--green:#8B5CF6;--sp-primary:#8B5CF6;--violet-bright:#8B5CF6;--violet-soft:#C4B5FD;--violet-edge:#514069}
+body{accent-color:#8B5CF6}
+::selection{background:#8B5CF6;color:#100D1F}
+:where(button,a,[role="button"],input,select,textarea):focus-visible{outline-color:#C4B5FD!important}
+:where(input[type="checkbox"],input[type="radio"],input[type="range"]){accent-color:#8B5CF6!important}
+:where(.button:not(.danger):not(.secondary),.button.primary,.sw-big-play,.hover-play,.sw-big-play:hover,.player-main-play:not(.mobile-now-play),.sw-big-play,button[type="submit"].primary){background:#8B5CF6!important;color:#100D1F!important}
+:where(.sw-big-play,.hover-play,.play-button,.artist-sticky-play,.artist-play,.sw-play,.mini-play,.btn-play):hover{filter:brightness(1.1)}
+:where(.eyebrow,.section-kicker,.admin-kicker,.studio-kicker,.admin-summary-card .eyebrow,.profile-eyebrow,.podcast-studio-hero .eyebrow,.artist-studio-hero .eyebrow){color:#C4B5FD!important}
+:where(.artist-analytics,.admin-overview,.admin-summary-card,.moderation-panel,.podcast-studio-card,.stat-card,.metric-card) :where(.eyebrow,.section-kicker){color:#C4B5FD!important}
+:where(.sidebar .library-item.active,.sidebar .library-item[aria-current="page"],.sidebar .library-pin-row.is-pinned .library-item.active){background:#261c39!important;border-color:#5b4380!important;box-shadow:inset 3px 0 0 #8B5CF6!important}
+:where(.library-filters .filter-pill.active,.filter-pill[aria-pressed="true"],.home-chips button.active,.sw-tab.active,.admin-tabs button.active,.admin-category-tabs button.active,.moderation-tabs button.active,.segmented button.active){background:#392652!important;color:#F8F7FF!important;border-color:#7051a4!important}
+:where(.artist-sticky-play,.artist-profile .sw-big-play,.coll-actions .sw-big-play,.album-detail .sw-big-play,.playlist-main .sw-big-play){background:#8B5CF6!important;color:#100D1F!important}
+:where(.status-pill.active,.status-badge.active,.type-pill.active){color:#DBCFFD!important;background:#352344!important;border-color:#694e8b!important}
+:where(.toast:not(.error),.toast-stack .toast:not(.error)){background:#322447!important;color:#F8F7FF!important;border-color:#6d5199!important}
+:where(.toast-mark,.toast-stack .toast-mark){background:#8B5CF6!important;color:#100D1F!important}
+:where(.toast.error .toast-mark,.toast-stack .toast.error .toast-mark){background:#ff8f9e!important;color:#30080e!important}
+:where(.button.secondary,.admin-summary-card .button.secondary,.admin-overview .button.secondary,.admin-suite .button.secondary,.artist-studio-hero .button.secondary){background:#2e2142!important;border-color:#594371!important;color:#F8F7FF!important}
+:where(.button.secondary:hover,.filter-pill:hover,.sidebar .library-item:hover:not(.active)){background:#3a2a51!important}
+:where(.now-card a,.rail-card a,.text-link,.link-accent,.songrow .active,.player-song-text .active){color:#C4B5FD!important}
+:where(.sw-modal input:focus,.sw-modal select:focus,.sw-modal textarea:focus,.edit-song-dialog input:focus,.upload-wizard-dialog input:focus){border-color:#8B5CF6!important;box-shadow:0 0 0 2px #8B5CF633!important}
+/* Retain genuine semantic indications: destructive/warning red, chart trends green. */
+:where(.artist-analytics,.admin-dashboard,.admin-suite,.artist-suite,.analytics-panel,.chart-card) svg.sparkline polyline,
+:where(.artist-analytics,.admin-dashboard,.admin-suite,.artist-suite,.analytics-panel,.chart-card) svg.sparkline path{stroke:#1ed760!important}
+/* Karaoke: per-artist brand color, never the former hard-coded red/green surfaces. */
+@media(min-width:701px){
+ body.karaoke-mode .workspace .main .karaoke-panel,
+ body.karaoke-mode .karaoke-panel{
+  background:linear-gradient(165deg,var(--karaoke-artist-color,#4b3675) 0%,var(--karaoke-artist-dark,#20152e) 76%,#100D1F 100%)!important;
+  color:#F8F7FF!important;
+  border:1px solid #ffffff15;
+ }
+ body.karaoke-mode .karaoke-lines.karaoke-empty{
+  background:#100D1F52!important;
+  border:1px solid #ffffff19!important;
+  color:#EEE7FF!important;
+ }
+ body.karaoke-mode .karaoke-heading h2{color:#F8F7FF!important}
+ body.karaoke-mode .karaoke-kicker,body.karaoke-mode .karaoke-subtitle{color:#E2D7FF!important}
+}
