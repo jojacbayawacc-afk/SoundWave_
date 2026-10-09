@@ -514,6 +514,7 @@ async function refreshViewedArtistCover(artistId) {
   }
 }
 function navigate(page, extras = {}) {
+  closeKaraokeSearchOverlay();
   if (!pageAllowed(page)) return toast('This page is not available for your account.', true);
   if (page === 'playlists' && !('selectedPlaylist' in extras)) state.selectedPlaylist = null;
   state.page = page; Object.assign(state, extras);
@@ -748,13 +749,14 @@ ${addToPlaylistDialog()}`;
   const g = $('#global-search');
   if (g) {
     g.addEventListener('input', () => setSearch(g.value, g));
-    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') { rememberSearch(g.value); if (state.page !== 'music' && g.value.trim()) navigate('music'); } });
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') { rememberSearch(g.value); if (state.karaokeMode && state.player?.kind==='song') renderKaraokeSearchOverlay(); else if (state.page !== 'music' && g.value.trim()) navigate('music'); } });
   }
   document.querySelectorAll('[data-clear-search]').forEach((btn) => btn.addEventListener('click', (e) => {
     e.preventDefault();
     const input = document.getElementById(btn.dataset.clearSearch);
     if (!input) return;
     state.searchQuery = '';
+    closeKaraokeSearchOverlay();
     document.querySelectorAll('#global-search,#page-search').forEach((el) => { el.value = ''; });
     if (state.page === 'music') renderSearchResults();
     else render();
@@ -2068,6 +2070,10 @@ function searchFieldHtml(id, className, placeholder, label) {
 function setSearch(q, from) {
   state.searchQuery = q;
   document.querySelectorAll('#global-search,#page-search').forEach((el) => { if (el !== from && el.value !== q) el.value = q; });
+  if (state.karaokeMode && state.player?.kind === 'song') {
+    renderKaraokeSearchOverlay();
+    return;
+  }
   if (state.page !== 'music') {
     if (!String(q || '').trim()) return;
     state.focusSearch = from?.id || 'global-search';
@@ -2077,6 +2083,26 @@ function setSearch(q, from) {
   }
   renderSearchResults();
 }
+// Karaoke search displays over the lyrics view rather than routing away.
+function closeKaraokeSearchOverlay(){document.getElementById('karaoke-search-overlay')?.remove();}
+function renderKaraokeSearchOverlay(){
+  const term=String(state.searchQuery||'').trim();
+  if(!state.karaokeMode || state.player?.kind!=='song' || !term){closeKaraokeSearchOverlay();return;}
+  let overlay=document.getElementById('karaoke-search-overlay');
+  if(!overlay){
+    overlay=document.createElement('section');
+    overlay.id='karaoke-search-overlay';overlay.className='karaoke-search-overlay';
+    overlay.setAttribute('aria-label','Search results over karaoke');
+    overlay.innerHTML='<div class="karaoke-search-toolbar"><strong>Search SoundWave</strong><button type="button" id="karaoke-search-close" aria-label="Close search results">✕</button></div><div id="karaoke-search-results"></div>';
+    document.body.appendChild(overlay);
+  }
+  const results=overlay.querySelector('#karaoke-search-results');
+  results.innerHTML=searchResultsHtml();
+  bindContent(results);bindMusic(results);bindSearchBits(results);syncHearts();markPlaying();
+  overlay.querySelector('#karaoke-search-close').onclick=()=>{closeKaraokeSearchOverlay();};
+}
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape')closeKaraokeSearchOverlay();});
+document.addEventListener('click',(event)=>{if(event.target.closest?.('[data-karaoke-toggle]') && state.karaokeMode)closeKaraokeSearchOverlay();},true);
 function fuzzyScore(text, query){
   text=String(text||'').toLowerCase();query=String(query||'').trim().toLowerCase();if(!query)return 1;
   if(text===query)return 120;if(text.startsWith(query))return 100-query.length;if(text.includes(query))return 80-query.length;
