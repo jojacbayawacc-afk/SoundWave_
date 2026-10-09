@@ -617,6 +617,14 @@ async function syncKaraokePanel(){
  document.body.classList.toggle('karaoke-mode',Boolean(state.karaokeMode && state.player?.kind==='song'));
  if(!document.body.classList.contains('karaoke-mode'))return;
  const panel=document.createElement('section');panel.className='karaoke-panel';panel.setAttribute('aria-label','Karaoke lyrics');
+ // Stable, artist-based color families; the base Midnight Violet surface remains the fallback.
+ const currentSong=songById(state.player?.id);
+ const artistKey=String(currentSong?.album?.artist?.artist_id ?? state.player?.artist ?? state.player?.id ?? '0');
+ let artistHash=0;for(const character of artistKey)artistHash=((artistHash*31)+character.charCodeAt(0))>>>0;
+ const artistThemes=[['#513e8d','#241731'],['#55408b','#201b41'],['#68416e','#281a36'],['#35537b','#191e3c'],['#764363','#2b1b35'],['#4f548a','#1e1e3f']];
+ const colors=artistThemes[artistHash%artistThemes.length];
+ panel.style.setProperty('--karaoke-artist-color',colors[0]);
+ panel.style.setProperty('--karaoke-artist-dark',colors[1]);
  const heading=document.createElement('div');heading.className='karaoke-heading';heading.innerHTML='<span class="karaoke-kicker">KARAOKE MODE</span><h2></h2><small class="karaoke-subtitle"></small>';heading.querySelector('h2').textContent=state.player.title||'Karaoke';heading.querySelector('.karaoke-subtitle').textContent=state.player.artist||'';
  const lines=document.createElement('div');lines.className='karaoke-lines';lines.textContent='Loading lyrics…';panel.append(heading,lines);main.append(panel);
  const songId=state.player.id;
