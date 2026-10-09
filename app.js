@@ -1405,15 +1405,14 @@ function authView(register=false){
           <h2>Log in or sign up</h2>
           <p class="muted">Continue with Google or use your email.</p>
         </div>
-        ${register?`<div class="oauth-role-choice" role="group" aria-label="Register as"><span>Register as</span><label><input type="radio" name="google-role" value="Listener" checked> Listener</label><label><input type="radio" name="google-role" value="Artist"> Artist</label></div><div class="oauth-artist-name" id="oauth-artist-name-wrap" hidden><label for="oauth-artist-name">Artist name</label><input id="oauth-artist-name" maxlength="100" placeholder="Your stage name"></div>`:''}
+        ${register?`<fieldset class="oauth-role-choice" aria-label="Create an account as"><legend>Register as</legend><label><input type="radio" name="google-role" value="Listener" checked> Listener</label><label><input type="radio" name="google-role" value="Artist"> Artist</label></fieldset><div class="oauth-artist-name" id="oauth-artist-name-wrap" hidden><label for="oauth-artist-name">Artist name</label><input id="oauth-artist-name" maxlength="100" placeholder="Your stage name"><small class="field-help availability" id="artist-name-status"></small></div>`:''}
         <button type="button" class="button secondary auth-google" id="auth-google"><span class="auth-google-mark">G</span><span>Continue with Google</span></button>
-        <button type="button" class="button secondary auth-email-toggle" id="auth-email-toggle">${icon('forward')}<span>Continue with email</span></button>
-        <div class="auth-separator"><span>or</span></div>
+        <button type="button" class="button secondary auth-email-toggle" id="auth-email-toggle">${icon('forward')}<span>Use email instead</span></button>
         <div class="auth-email-shell${emailOpen}" id="auth-email-shell">
           <div class="auth-mode"><button class="button ${register?'secondary':''}" id="mode-login">Sign in</button><button class="button ${register?'':'secondary'}" id="mode-register">Sign up</button></div>
           <form class="form" id="authform" novalidate>
             <div class="auth-form-alert" id="auth-form-alert" role="alert" hidden></div>
-            ${register?`<div class="field"><label>Display name</label><input id="display-name" required maxlength="90" placeholder="Alex Rivera"/><small class="field-help availability" id="display-name-status"></small></div><div class="field"><label>Account type</label><select id="account-type"><option value="Listener">Listener</option><option value="Artist">Artist</option></select></div><div class="field" id="artist-name-field" style="display:none"><label>Artist name</label><input id="artist-name" maxlength="100" placeholder="Your stage name"/><small class="field-help availability" id="artist-name-status"></small></div>`:''}
+            ${register?`<div class="field"><label>Display name</label><input id="display-name" required maxlength="90" placeholder="Alex Rivera"/><small class="field-help availability" id="display-name-status"></small></div>`:''}
             <div class="field"><label>Email</label><input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"/><small class="field-help auth-field-error" id="auth-email-error"></small></div>
             <div class="field"><label>Password</label><input id="auth-password" type="password" minlength="6" autocomplete="${register?'new-password':'current-password'}" required placeholder="At least 6 characters"/><small class="field-help auth-field-error" id="auth-password-error"></small></div>
             <button class="button auth-email-submit" data-busy>${register?'Create account':'Sign in'}</button>
@@ -1433,7 +1432,13 @@ function authView(register=false){
   });
   $('#mode-login').onclick=()=>authView(false);
   $('#mode-register').onclick=()=>authView(true);
-  document.querySelectorAll('input[name="google-role"]').forEach(el=>el.addEventListener('change',()=>{ const wrap=$('#oauth-artist-name-wrap');if(wrap)wrap.hidden=document.querySelector('input[name="google-role"]:checked')?.value!=='Artist'; }));
+  const registrationRole=()=>document.querySelector('input[name="google-role"]:checked')?.value==='Artist'?'Artist':'Listener';
+  document.querySelectorAll('input[name="google-role"]').forEach(el=>el.addEventListener('change',()=>{
+    const artist=registrationRole()==='Artist';
+    const wrap=$('#oauth-artist-name-wrap');if(wrap)wrap.hidden=!artist;
+    const field=$('#artist-name-field');if(field)field.style.display=artist?'flex':'none';
+    const input=$('#artist-name');if(input)input.required=artist;
+  }));
   $('#auth-google')?.addEventListener('click',()=>action(async()=>{
     clearAuthErrors();
     const redirectTo=`${window.location.origin}/auth-callback.html`;
@@ -1453,10 +1458,10 @@ function authView(register=false){
     if(!data?.url)throw Error('Google did not return an authorization URL. Check the Google provider configuration in Supabase.');
     window.location.assign(data.url);
   }));
-  $('#account-type')?.addEventListener('change',e=>{const a=e.target.value==='Artist';$('#artist-name-field').style.display=a?'flex':'none';$('#artist-name').required=a;});
+
   if(register){
-    const validateIdentity=async()=>{if(val('account-type')!=='Artist')return true;const display=val('display-name'),artist=val('artist-name');if(!display||!artist)return true;try{const r=await checkArtistIdentityAvailability(display,artist);setFieldState($('#display-name'),$('#display-name-status'),r.displayAvailable,r.displayAvailable?'Display name is available.':'That display name is already taken.');setFieldState($('#artist-name'),$('#artist-name-status'),r.artistAvailable,r.artistAvailable?'Artist name is available.':'That artist name is already taken.');return r.displayAvailable&&r.artistAvailable;}catch(err){console.warn('Name availability check failed',err);return true;}};
-    $('#display-name')?.addEventListener('blur',validateIdentity);$('#artist-name')?.addEventListener('blur',validateIdentity);
+    const validateIdentity=async()=>{if(registrationRole()!=='Artist')return true;const display=val('display-name'),artist=val('oauth-artist-name');if(!display||!artist)return true;try{const r=await checkArtistIdentityAvailability(display,artist);setFieldState($('#display-name'),$('#display-name-status'),r.displayAvailable,r.displayAvailable?'Display name is available.':'That display name is already taken.');setFieldState($('#oauth-artist-name'),$('#artist-name-status'),r.artistAvailable,r.artistAvailable?'Artist name is available.':'That artist name is already taken.');return r.displayAvailable&&r.artistAvailable;}catch(err){console.warn('Name availability check failed',err);return true;}};
+    $('#display-name')?.addEventListener('blur',validateIdentity);$('#oauth-artist-name')?.addEventListener('blur',validateIdentity);
   }
   $('#authform').onsubmit=e=>{e.preventDefault();action(async()=>{
     clearAuthErrors();
@@ -1469,7 +1474,7 @@ function authView(register=false){
       if(r.error){if(/email_not_confirmed|not confirmed/i.test(`${r.error.code||''} ${r.error.message||''}`)){confirmView(email);return;}const friendly=authErrorMessage(r.error)||humanErr(r.error);showAuthError(friendly,/invalid_credentials|password/i.test(`${r.error.code||''} ${r.error.message||''}`)?'password':'');return;}
       await finishInteractiveSignIn(r.data?.session);toast('Signed in');return;
     }
-    const account_type=val('account-type'),display_name=val('display-name'),artist_name=account_type==='Artist'?val('artist-name'):null;
+    const account_type=registrationRole(),display_name=val('display-name'),artist_name=account_type==='Artist'?val('artist-name'):null;
     const displayProblem=plainNameProblem(display_name,'Display name',90);if(displayProblem){showAuthError(displayProblem);return;}
     if(account_type==='Artist'){
       if(!artist_name) throw Error('Artist name is required.');
@@ -1950,7 +1955,7 @@ function libraryEntries() {
   return rows;
 }
 const PIN_KEY='soundwave-library-pins-v1';
-function libraryPinnedIds(){try{return new Set(JSON.parse(localStorage.getItem(PIN_KEY)||'[]'))}catch{return new Set()}}
+function libraryPinnedIds(){try{const values=JSON.parse(localStorage.getItem(PIN_KEY)||'[]');return new Set(Array.isArray(values)?values:[])}catch{return new Set()}}
 function toggleLibraryPin(key){const pins=libraryPinnedIds();pins.has(key)?pins.delete(key):pins.add(key);localStorage.setItem(PIN_KEY,JSON.stringify([...pins]));renderLibraryList();}
 document.addEventListener('click',e=>{const b=e.target.closest?.('.album-pin-control[data-pin-key]');if(!b)return;e.preventDefault();e.stopPropagation();toggleLibraryPin(b.dataset.pinKey);b.setAttribute('aria-label',libraryPinnedIds().has(b.dataset.pinKey)?'Unpin album':'Pin album');b.title=b.getAttribute('aria-label');});
 function libraryListHtml() {
@@ -1958,13 +1963,15 @@ function libraryListHtml() {
   const item = (cls, art, name, metaHtml, attrs, active) => `<button type="button" class="library-item ${cls} ${active ? 'active' : ''}" ${attrs} title="${esc(name)}">${art}<span class="library-item-label"><strong>${esc(name)}</strong><small>${metaHtml}</small></span></button>`;
   const pinned=libraryPinnedIds();
   const parts = [];
-  // Liked Songs is always pinned first, exactly like Spotify.
+  // Built-in collections remain in the library, but may be unpinned.
   if ((f === 'all' || f === 'playlists') && (!q || 'liked songs'.includes(q))) {
     const meta = state.likesAvailable ? `${state.liked.length} ${state.liked.length === 1 ? 'song' : 'songs'}` : 'Set up needed';
-    parts.push(item('liked pinned', `<span class="library-art liked-art">${icon('heart')}</span>`, 'Liked Songs', `<span class="pin-ico">${icon('pin')}</span>Playlist · ${meta}`, 'data-nav="liked-songs"', state.page === 'liked-songs'));
+    const isPinned=!pinned.has('builtin:liked:unpinned');
+    parts.push(`<div class="library-pin-row ${isPinned?'is-pinned':''}">${item('liked', `<span class="library-art liked-art">${icon('heart')}</span>`, 'Liked Songs', `${isPinned?`<span class="pin-ico">${icon('pin')}</span>`:''}Playlist · ${meta}`, 'data-nav="liked-songs"', state.page === 'liked-songs')}<button type="button" class="library-pin-action" data-pin-key="builtin:liked:unpinned" aria-label="${isPinned?'Unpin':'Pin'} Liked Songs" title="${isPinned?'Unpin':'Pin'} Liked Songs">${icon('pin')}</button></div>`);
   }
   if ((f === 'all' || f === 'playlists') && (!q || 'your top songs of the week'.includes(q) || 'your top songs'.includes(q))) {
-    parts.push(item('weekly pinned', `<span class="library-art weekly-art">${icon('music')}</span>`, 'Your Top Songs', `<span class="pin-ico">${icon('pin')}</span>Auto playlist · ${state.personalTopSongs.length} songs`, 'data-nav="top-songs"', state.page === 'top-songs'));
+    const isPinned=!pinned.has('builtin:top:unpinned');
+    parts.push(`<div class="library-pin-row ${isPinned?'is-pinned':''}">${item('weekly', `<span class="library-art weekly-art">${icon('music')}</span>`, 'Your Top Songs', `${isPinned?`<span class="pin-ico">${icon('pin')}</span>`:''}Auto playlist · ${state.personalTopSongs.length} songs`, 'data-nav="top-songs"', state.page === 'top-songs')}<button type="button" class="library-pin-action" data-pin-key="builtin:top:unpinned" aria-label="${isPinned?'Unpin':'Pin'} Your Top Songs" title="${isPinned?'Unpin':'Pin'} Your Top Songs">${icon('pin')}</button></div>`);
   }
   const libEntries=libraryEntries();
   const pinKey=e=>{const attrs=e.attrs||'';const p=attrs.match(/data-openplaylist="(\d+)"/);if(p)return 'playlist:'+p[1];const a=attrs.match(/data-open-album="(\d+)"/);return a?'album:'+a[1]:null;};
