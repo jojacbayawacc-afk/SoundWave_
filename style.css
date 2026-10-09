@@ -4916,3 +4916,9 @@ html body #curated-slider.shelf.curated-slider::-webkit-scrollbar-track {
   display: none !important;
   background: transparent !important;
 }
+
+/* Static library selection: remove click animation while preserving selected state */
+.sidebar .sidebar-click-pop,.sidebar .library-item,.sidebar .library-item::before,.sidebar .library-item::after{animation:none!important;transform:none!important;transition:background-color .12s ease,color .12s ease,border-color .12s ease!important}
+.sidebar .sidebar-motion-indicator{display:none!important}
+.top-songs-cover{display:grid;place-items:center;background:linear-gradient(135deg,#195a4c,#417a65)}
+.top-songs-cover svg{width:38%;height:38%;color:#fff}
