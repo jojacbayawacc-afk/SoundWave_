@@ -5023,3 +5023,25 @@ input[type=range],input[type=checkbox],input[type=radio]{accent-color:#8B5CF6}
 .auth-v28 .oauth-artist-name input:focus{outline:2px solid #8B5CF6;outline-offset:1px}
 .auth-v28 .auth-separator{display:none!important}
 @media(max-width:700px){.auth-v28 .oauth-role-choice{gap:8px}.auth-v28 .oauth-role-choice label{font-size:13px}}
+
+/* 2026-10-09 final scoped visual clean-up */
+.auth-v28 fieldset.oauth-role-choice{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;column-gap:10px!important;row-gap:8px!important;align-items:stretch!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;border:0!important;padding:0!important;margin:0 0 15px!important}
+.auth-v28 fieldset.oauth-role-choice legend{float:none!important;width:auto!important;grid-column:1/-1!important;padding:0!important;margin:0 0 4px!important;line-height:1.4!important;}
+.auth-v28 fieldset.oauth-role-choice label{display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:10px 8px!important;min-height:46px!important;white-space:nowrap!important}
+.auth-v28 fieldset.oauth-role-choice input[type=radio]{flex:0 0 auto!important;width:16px!important;height:16px!important;margin:0!important}
+@media(max-width:380px){.auth-v28 fieldset.oauth-role-choice{column-gap:7px!important}.auth-v28 fieldset.oauth-role-choice label{font-size:12px!important;padding:10px 5px!important}}
+/* Right-click library menus replace the constantly exposed pin controls; keyboard focus is preserved. */
+.sidebar .library-pin-row .library-pin-action{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;clip-path:inset(50%)!important;padding:0!important;border:0!important}
+.sidebar .library-pin-row .library-pin-action:focus-visible{position:absolute!important;right:5px!important;top:5px!important;width:32px!important;height:32px!important;clip-path:none!important;opacity:1!important;pointer-events:auto!important}
+.library-context-menu{position:fixed;z-index:10000;min-width:185px;padding:6px;border-radius:12px;border:1px solid #55406e;background:#211537;box-shadow:0 14px 45px #0009}
+.library-context-menu button{display:block;width:100%;min-height:40px;border:0;border-radius:8px;padding:9px 12px;background:transparent;color:#F8F7FF;text-align:left;font:inherit;cursor:pointer}
+.library-context-menu button:hover,.library-context-menu button:focus-visible{background:#3e2a61;outline:0}
+/* Violet UI accents; keep streaming and analytics chart plot colors unchanged. */
+:root{--sp-green:#8B5CF6;--accent:#8B5CF6;--green:#8B5CF6;--sp-primary:#8B5CF6;--sw-green:#8B5CF6}
+button.button:not(.secondary):not(.danger),.button.primary,.button.primary:hover,.sw-big-play,.hover-play,.sw-big-play:hover{background:#8B5CF6!important;color:#100D1F!important}
+.sidebar .library-item.active,.sidebar .library-pin-row.is-pinned .library-item{border-color:#60418c!important;box-shadow:inset 3px 0 0 #8B5CF6!important}
+.sidebar .library-item.active strong,.sidebar .library-item .pin-ico,.sidebar .library-pin-row .pin-ico{color:#C4B5FD!important}
+.auth-v28 .auth-box :is(input,select,button):focus-visible{outline-color:#C4B5FD!important}
+.admin-overview button:hover,.admin-summary-card .button,.admin-dashboard .button,.artist-studio-hero .button,.podcast-studio-hero .button{border-color:#584079!important}
+.admin-suite .eyebrow,.artist-suite .eyebrow,.admin-summary-card .eyebrow,.artist-studio-hero .eyebrow,.admin-overview .eyebrow,.admin-panel .eyebrow{color:#C4B5FD!important}
+/* preserve original green SVG chart traces and bar / sparkline charts */
