@@ -400,6 +400,34 @@ function albumTile(a) {
   return `<article class="release-tile card-link" tabindex="0" role="link" data-open-album="${a.album_id}" data-queue="${q}"><span class="release-art">${albumArt({ song_id: a.album_id, album: a }, 'large')}<button type="button" class="hover-play" data-play="${a.songs[0].song_id}" aria-label="Play ${esc(a.title)}">${icon('play')}</button></span><strong>${esc(a.title)}</strong><small>${yearOf(a.release_date) ? yearOf(a.release_date) + ' · ' : ''}${esc(a.artist?.artist_name || 'SoundWave')}</small></article>`;
 }
 function publiclyReleasedArtist(a){return isOwnArtist(a)||songsByArtist(a.artist_id).some(s=>s.is_active!==false && s.album?.is_active!==false);}
+function artistArtwork(a, initialClass='artist-search-photo') {
+ const id=Number(a?.artist_id)||0, path=a?.cover_path;
+ const url=path&&state.coverUrls?.[path];
+ return url ? `<img class="${initialClass}" data-artist-photo="${id}" src="${esc(url)}" alt="" loading="lazy" decoding="async">` : `<span class="artist-initial" data-artist-initial="${id}">${esc(a?.artist_name?.[0]||'A')}</span>`;
+}
+function updateArtistArtwork(a){
+ if(!a)return;
+ const id=Number(a.artist_id),url=a.cover_path&&state.coverUrls[a.cover_path];
+ if(!url)return;
+ document.querySelectorAll(`[data-artist-photo-host="${id}"]`).forEach(host=>{
+   let img=host.querySelector('img[data-artist-photo]');
+   if(!img){img=document.createElement('img');img.className='artist-search-photo';img.dataset.artistPhoto=String(id);img.alt='';img.loading='lazy';img.decoding='async';host.prepend(img);}
+   if(img.src!==url)img.src=url;
+   host.querySelector('[data-artist-initial]')?.remove();
+ });
+}
+async function hydrateArtistCovers(artists=state.artists){
+ const paths=[...new Set((artists||[]).map(a=>a.cover_path).filter(p=>p&&!state.coverUrls[p]))];
+ if(!paths.length)return;
+ // Resolve in small groups to avoid flooding Storage with parallel signed-URL requests.
+ for(let i=0;i<paths.length;i+=8){
+  const batch=paths.slice(i,i+8);
+  await Promise.all(batch.map(async path=>{
+    try{const url=await resolveCoverUrl(path);if(url){state.coverUrls[path]=url;(artists||[]).filter(a=>a.cover_path===path).forEach(updateArtistArtwork);}}
+    catch(e){console.warn('Artist artwork unavailable:',e);}
+  }));
+ }
+}
 function artistCard(a, i = 0, o = {}) {
   const songs = songsByArtist(a.artist_id);
   const ownVerified = isOwnArtist(a) && state.socialRpc?.mine;
@@ -407,7 +435,7 @@ function artistCard(a, i = 0, o = {}) {
   const followerCount = hasVerifiedCount && state.followerCounts?.[Number(a.artist_id)] != null ? Number(state.followerCounts[Number(a.artist_id)]) : null;
   const followerLabel = followerCount == null ? 'Follower count unavailable' : `${followerCount.toLocaleString()} ${followerCount === 1 ? 'follower' : 'followers'}`;
   const rank = Number(o?.rank || 0);
-  return `<article class="artist-card clickable ${o?.showFollowers ? 'ranked-artist-card' : ''}" tabindex="0" role="link" data-open-artist="${a.artist_id}" ${songs.length ? `data-queue="${ids(songs).join(',')}"` : ''}>${rank ? `<span class="artist-rank" aria-label="Rank ${rank}">#${rank}</span>` : ''}<span class="artist-round" style="background:${grad(i)}">${esc(a.artist_name?.[0] || 'A')}${songs.length ? `<button type="button" class="hover-play" data-play="${songs[0].song_id}" aria-label="Play ${esc(a.artist_name)}">${icon('play')}</button>` : ''}</span><strong>${esc(a.artist_name)}</strong><small>Artist</small>${o?.showFollowers ? `<span class="artist-follower-proof" data-follower-count="${a.artist_id}">${esc(followerLabel)}</span>` : (followerCount != null ? `<small data-follower-count="${a.artist_id}">${esc(followerLabel)}</small>` : '')}${o && o.follow === true ? followBtn(a, 'sm') : ''}</article>`;
+  return `<article class="artist-card clickable ${o?.showFollowers ? 'ranked-artist-card' : ''}" tabindex="0" role="link" data-open-artist="${a.artist_id}" ${songs.length ? `data-queue="${ids(songs).join(',')}"` : ''}>${rank ? `<span class="artist-rank" aria-label="Rank ${rank}">#${rank}</span>` : ''}<span class="artist-round" data-artist-photo-host="${a.artist_id}" style="background:${grad(i)}">${artistArtwork(a)}${songs.length ? `<button type="button" class="hover-play" data-play="${songs[0].song_id}" aria-label="Play ${esc(a.artist_name)}">${icon('play')}</button>` : ''}</span><strong>${esc(a.artist_name)}</strong><small>Artist</small>${o?.showFollowers ? `<span class="artist-follower-proof" data-follower-count="${a.artist_id}">${esc(followerLabel)}</span>` : (followerCount != null ? `<small data-follower-count="${a.artist_id}">${esc(followerLabel)}</small>` : '')}${o && o.follow === true ? followBtn(a, 'sm') : ''}</article>`;
 }
 function showCard(p, i = 0) {
   const art=p.cover_path&&state.coverUrls[p.cover_path]?`<img class="cover-img" src="${esc(state.coverUrls[p.cover_path])}" alt="${esc(p.show_title)}">`:icon('mic');
@@ -501,7 +529,7 @@ async function refreshViewedArtistCover(artistId) {
     // Refresh signed URLs when an artist is opened, but render the existing image immediately.
     // A newly uploaded cover has a unique object path, so it does not inherit stale artwork.
     const url = await resolveCoverUrl(newPath);
-    if (url) state.coverUrls[newPath] = url;
+    if (url) { state.coverUrls[newPath] = url; updateArtistArtwork(artist); }
   }
   if (sequence !== artistCoverRequestSequence || state.page !== 'artist-detail' || Number(state.selectedArtist) !== Number(artistId)) return;
   const banner = document.getElementById('artist-profile-hero');
@@ -523,7 +551,11 @@ function navigate(page, extras = {}) {
   document.body.classList.toggle('karaoke-mode', Boolean(state.karaokeMode && state.player?.kind==='song'));
   render();
   if (page === 'top-songs') void refreshPersonalTopSongs();
-  if (page === 'artist-detail') void refreshViewedArtistCover(state.selectedArtist);
+  if (page === 'artist-detail') {
+    const viewed=state.artists.find(a=>Number(a.artist_id)===Number(state.selectedArtist));
+    if(viewed?.cover_path&&state.coverUrls[viewed.cover_path]) updateArtistArtwork(viewed);
+    else void refreshViewedArtistCover(state.selectedArtist);
+  }
   const main = document.getElementById('main-content'); if (main) main.scrollTop = 0;
   if (page === 'artist-detail' && state.selectedArtist) {
     // Search-card navigation renders immediately; the popularity RPC is async.
@@ -1658,6 +1690,7 @@ async function loadData(){if(!state.user)return;const id=state.user.id;const req
  if(!isPremiumUser() && state.offlineDownloads.length){await clearOfflineDownloads(id);state.offlineDownloads=[];}
   const newPaths=[...new Set([...state.songs.flatMap(x=>[x.cover_path,x.album?.cover_path]),...state.ownedSongs.map(x=>x.cover_path),...state.albums.map(x=>x.cover_path)].filter(x=>x&&!state.coverUrls[x]))].slice(0,220);
  if(newPaths.length){const urls=await Promise.all(newPaths.map(async path=>[path,await resolveCoverUrl(path)]));urls.forEach(([path,url])=>{if(url)state.coverUrls[path]=url;});}
+ void hydrateArtistCovers(state.artists);
  // Mission 4 feature append: use the newer helper RPCs when installed, but keep the original UI/data fallbacks.
  const [ps,ss,roy,ent2,adm,reqs,lib,social2,af2] = await Promise.all([
    db.rpc('profile_stats'),
@@ -1759,8 +1792,8 @@ function artistDetail() {
   const popularity=state.artistPopularity?.[String(artist.artist_id)]||{};
   const popularityLoaded=Object.prototype.hasOwnProperty.call(state.artistPopularity||{},String(artist.artist_id));
   const releases = [...songsByArtist(artist.artist_id)].sort((a,b)=>(Number(popularity[b.song_id]||0)-Number(popularity[a.song_id]||0))||(Number(b.song_id)-Number(a.song_id)));
-  const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id) && (a.is_published !== false || own));
   const own = isOwnArtist(artist), fc = followerText(artist.artist_id);
+  const albums = catalogAlbums().filter((a) => Number(a.artist?.artist_id) === Number(artist.artist_id) && (a.is_published !== false || own));
   const banner=artist.cover_path&&state.coverUrls[artist.cover_path];
   const bannerStyle=banner?`--artist-cover:url("${esc(banner)}");`:'';
   state.tint = tintFor(artist.artist_id);
@@ -2123,7 +2156,7 @@ function topResultHtml(d) {
   const score = (n) => { n = String(n || '').toLowerCase(); return n === q ? 3 : n.startsWith(q) ? 2 : n.includes(q) ? 1 : 0; };
   const c = [...d.artists.map((a) => ({ t: 'artist', s: score(a.artist_name) * 10 + 3, a })), ...d.songs.map((s) => ({ t: 'song', s: score(s.song_title) * 10 + 2, song: s })), ...d.albums.map((a) => ({ t: 'album', s: score(a.title) * 10 + 1, a }))].sort((x, y) => y.s - x.s)[0];
   if (!c) return '';
-  if (c.t === 'artist') { const songs = songsByArtist(c.a.artist_id); return `<article class="top-card clickable" tabindex="0" role="link" data-open-artist="${c.a.artist_id}" ${songs.length ? `data-queue="${ids(songs).join(',')}"` : ''}><span class="top-art round" style="background:${grad(c.a.artist_id)}">${esc(c.a.artist_name?.[0] || 'A')}</span><h3>${esc(c.a.artist_name)}</h3><span class="type-pill">Artist</span>${songs.length ? `<button type="button" class="hover-play" data-play="${songs[0].song_id}" aria-label="Play ${esc(c.a.artist_name)}">${icon('play')}</button>` : ''}</article>`; }
+  if (c.t === 'artist') { const songs = songsByArtist(c.a.artist_id); return `<article class="top-card clickable" tabindex="0" role="link" data-open-artist="${c.a.artist_id}" ${songs.length ? `data-queue="${ids(songs).join(',')}"` : ''}><span class="top-art round" data-artist-photo-host="${c.a.artist_id}" style="background:${grad(c.a.artist_id)}">${artistArtwork(c.a)}</span><h3>${esc(c.a.artist_name)}</h3><span class="type-pill">Artist</span>${songs.length ? `<button type="button" class="hover-play" data-play="${songs[0].song_id}" aria-label="Play ${esc(c.a.artist_name)}">${icon('play')}</button>` : ''}</article>`; }
   if (c.t === 'album') return `<article class="top-card clickable" tabindex="0" role="link" data-open-album="${c.a.album_id}" data-queue="${ids(c.a.songs).join(',')}"><span class="top-art">${albumArt({ song_id: c.a.album_id, album: c.a }, 'large')}</span><h3>${esc(c.a.title)}</h3><p><span class="type-pill">Album</span> ${esc(c.a.artist?.artist_name || '')}</p><button type="button" class="hover-play" data-play="${c.a.songs[0].song_id}" aria-label="Play ${esc(c.a.title)}">${icon('play')}</button></article>`;
   const s = c.song;
   return `<article class="top-card clickable" tabindex="0" role="link" ${s.album ? `data-open-album="${s.album.album_id}"` : ''} data-queue="${ids(d.songs).join(',')}"><span class="top-art">${albumArt(s, 'large')}</span><h3>${esc(s.song_title)}</h3><p><span class="type-pill">Song</span> ${esc(s.album?.artist?.artist_name || '')}</p><button type="button" class="hover-play" data-play="${s.song_id}" aria-label="Play ${esc(s.song_title)}">${icon('play')}</button></article>`;
