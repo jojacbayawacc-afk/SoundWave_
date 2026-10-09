@@ -4619,3 +4619,73 @@ body.karaoke-mode .workspace .main>.dashboard-content{display:none!important}
   body[data-page="playlists"] .tracks .t-title>.real-cover,
   body[data-page="playlists"] .tracks .t-title>.placeholder-art{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
 }
+
+/* 2026-10-09: Unified minimal navigation, calm library controls and one lyrics surface. */
+@media(min-width:901px){
+  .app-top{position:relative!important;display:flex!important;justify-content:space-between!important}
+  .app-top-left{display:flex!important;flex:1 1 0!important;min-width:0!important}
+  .app-top-left .global-search{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:min(520px,38vw)!important;max-width:calc(100vw - 620px)!important;z-index:5}
+  .top-actions{position:relative;z-index:6;flex:0 0 auto}
+  .custom-playbar{grid-template-columns:minmax(140px,1fr) minmax(320px,620px) minmax(140px,1fr)!important}
+  .custom-playbar .player-center{position:static!important;transform:none!important;width:100%!important;min-width:0!important;justify-self:center!important}
+  .custom-playbar .player-timeline{width:100%!important;max-width:620px!important;justify-content:center!important}
+  .custom-playbar .player-timeline input{min-width:0;flex:1 1 auto}
+}
+/* Playlist/Podcast/Artist chips show their names, never shrink them to icons. */
+.library-filter-shell{grid-template-columns:minmax(0,1fr) 30px!important;gap:4px!important;overflow:hidden}
+.library-filter-row{scroll-snap-type:none!important;scroll-behavior:auto!important;gap:6px!important;min-width:0}
+.library-filter-row .filter-pill,.library-filter-row .filter-pill.active{flex:0 0 auto!important;padding:7px 12px!important;min-width:max-content!important;max-width:none!important;transition:background-color .12s ease,color .12s ease,border-color .12s ease!important;transform:none!important}
+.library-filter-row .filter-pill .pill-label{white-space:nowrap!important;width:auto!important;display:inline!important;font-size:12px!important;opacity:1!important}
+.library-filter-arrow,.library-filter-arrow.at-end{width:30px!important;height:30px!important;border-radius:50%!important;transform:none!important;box-shadow:none!important;transition:background-color .12s ease!important}
+.library-filter-arrow svg,.library-filter-arrow.at-end svg{transition:none!important}
+.sidebar,.library-scroll,.library-art,.library-entry,.library-list-item{transition-duration:.12s!important}
+@media(prefers-reduced-motion:reduce){.sidebar,.library-scroll,.library-entry,.library-list-item{transition:none!important}}
+/* Karaoke is the full lyrics experience; do not repeat the same lyrics in the side rail. */
+body.karaoke-mode .context-rail{visibility:hidden!important}
+body.karaoke-mode .workspace{grid-template-columns:var(--sidebar-width,260px) minmax(0,1fr)!important}
+body.karaoke-mode .workspace .main{min-width:0!important}
+body.karaoke-mode .karaoke-panel{max-width:850px;min-height:100%;align-items:center}
+/* An open dialog must not put controls or playback timeline outside the viewport. */
+@media(max-width:900px){
+  .custom-playbar .player-center{min-width:0!important}
+  .custom-playbar .player-timeline{max-width:100%!important}
+  .library-filter-row .filter-pill{min-width:max-content!important}
+  .podcast-card-actions{flex-wrap:wrap!important;gap:8px!important}
+  .podcast-card-actions .button{flex:1 1 105px!important;min-width:0!important}
+}
+
+/* 2026-10-09: Admin album drill-down and mobile carousel surfaces. */
+.admin-albums-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,225px),1fr));gap:14px;min-width:0}
+.admin-album-card{display:flex;flex-direction:column;gap:11px;min-width:0;padding:13px;border-radius:16px;background:var(--sw-surface-2,#191d20);border:1px solid rgba(255,255,255,.09)}
+.admin-album-cover{aspect-ratio:1.7;display:grid;place-items:center;overflow:hidden;border-radius:10px;background:#202c29}
+.admin-album-cover img{width:100%;height:100%;object-fit:cover}
+.admin-album-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.admin-album-copy strong,.admin-album-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-album-count{font-size:12px;color:var(--muted,#b0b7b1)}
+.admin-album-card .status-pill{align-self:flex-start;width:max-content;justify-self:start}
+.admin-album-actions{display:flex;gap:7px;margin-top:auto}
+.admin-album-actions button{flex:1 1 0;min-width:0;white-space:normal}
+.admin-album-heading{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}
+.admin-album-heading h3{margin:0;min-width:0;overflow-wrap:anywhere}
+.admin-album-detail>.button{margin-bottom:12px}
+@media(max-width:700px){
+  /* Expanded discovery stays a swipeable carousel, not a massive vertical stack. */
+  body[data-page="discover"] .shelf,
+  body[data-page="discover"] .shelf.wrap,
+  body[data-page="discover"] .shelf.discover-expanded,
+  body[data-page="discover"] .popular-artist-shelf{
+    display:grid!important;grid-auto-flow:column!important;grid-auto-columns:minmax(148px,min(70vw,210px))!important;
+    grid-template-columns:none!important;overflow-x:auto!important;overflow-y:hidden!important;
+    overscroll-behavior-inline:contain;scroll-snap-type:x proximity;
+    scroll-padding-inline:12px;gap:12px;padding:0 12px 14px;
+    -webkit-overflow-scrolling:touch
+  }
+  body[data-page="discover"] .shelf>*{width:100%!important;min-width:0!important;max-width:100%!important;scroll-snap-align:start}
+  body[data-page="discover"] .shelf-section{min-width:0;max-width:100%;overflow:hidden}
+  .admin-albums-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .admin-album-card{padding:9px;gap:8px}
+  .admin-album-actions{flex-direction:column}
+  .admin-album-actions button{width:100%;min-height:38px}
+  .admin-album-detail .admin-song-card{min-width:0;max-width:100%}
+}
+@media(max-width:380px){.admin-albums-grid{grid-template-columns:minmax(0,1fr)}}
