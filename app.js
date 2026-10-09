@@ -1405,6 +1405,7 @@ function authView(register=false){
           <h2>Log in or sign up</h2>
           <p class="muted">Continue with Google or use your email.</p>
         </div>
+        ${register?`<div class="oauth-role-choice" role="group" aria-label="Register as"><span>Register as</span><label><input type="radio" name="google-role" value="Listener" checked> Listener</label><label><input type="radio" name="google-role" value="Artist"> Artist</label></div><div class="oauth-artist-name" id="oauth-artist-name-wrap" hidden><label for="oauth-artist-name">Artist name</label><input id="oauth-artist-name" maxlength="100" placeholder="Your stage name"></div>`:''}
         <button type="button" class="button secondary auth-google" id="auth-google"><span class="auth-google-mark">G</span><span>Continue with Google</span></button>
         <button type="button" class="button secondary auth-email-toggle" id="auth-email-toggle">${icon('forward')}<span>Continue with email</span></button>
         <div class="auth-separator"><span>or</span></div>
@@ -1432,10 +1433,17 @@ function authView(register=false){
   });
   $('#mode-login').onclick=()=>authView(false);
   $('#mode-register').onclick=()=>authView(true);
+  document.querySelectorAll('input[name="google-role"]').forEach(el=>el.addEventListener('change',()=>{ const wrap=$('#oauth-artist-name-wrap');if(wrap)wrap.hidden=document.querySelector('input[name="google-role"]:checked')?.value!=='Artist'; }));
   $('#auth-google')?.addEventListener('click',()=>action(async()=>{
     clearAuthErrors();
     const redirectTo=`${window.location.origin}/auth-callback.html`;
     const pendingParams=new URLSearchParams(location.search);const pendingInvite={playlist_invite:pendingParams.get('playlist_invite'),subscription_invite:pendingParams.get('subscription_invite')};if(pendingInvite.playlist_invite||pendingInvite.subscription_invite)sessionStorage.setItem('soundwave-pending-invite',JSON.stringify(pendingInvite));
+    if(register){
+      const role=document.querySelector('input[name="google-role"]:checked')?.value==='Artist'?'Artist':'Listener';
+      const artistName=role==='Artist'?String($('#oauth-artist-name')?.value||'').trim():'';
+      if(role==='Artist'&&!artistName){showAuthError('Enter your artist name before continuing with Google.');return;}
+      sessionStorage.setItem('soundwave-google-registration',JSON.stringify({role,artistName}));
+    } else sessionStorage.removeItem('soundwave-google-registration');
     sessionStorage.setItem('soundwave-oauth-return','google');
     const {data,error}=await db.auth.signInWithOAuth({
       provider:'google',
@@ -1923,6 +1931,13 @@ function libraryEntries() {
       : icon('music');
     add(p.playlist_name, `Playlist · ${p.visibility}`, `<span class="library-art playlist-library-art" style="background:${grad(i)}">${playlistArt}</span>`, `data-openplaylist="${p.playlist_id}"`, state.page === 'playlists' && state.selectedPlaylist === p.playlist_id);
   });
+  if(f==='all'||f==='playlists'){
+    const pinnedAlbums=libraryPinnedIds();
+    catalogAlbums().filter(a=>pinnedAlbums.has('album:'+a.album_id)).forEach(a=>{
+      if(q && !String(a.title).toLowerCase().includes(q))return;
+      add(a.title,`Album · ${a.artist?.artist_name||'SoundWave'}`,`<span class="library-art playlist-library-art">${albumArt({album:a},'tiny')}</span>`,`data-open-album="${a.album_id}"`,state.page==='album-detail'&&Number(state.selectedAlbum)===Number(a.album_id));
+    });
+  }
   if (f === 'all' || f === 'podcasts') state.myShows.filter((s) => s.is_active).slice(0, 40).forEach((s, i) => {
     const podcastArt = s.cover_path && state.coverUrls[s.cover_path]
       ? `<img class="cover-img" src="${esc(state.coverUrls[s.cover_path])}" alt="${esc(s.show_title)}">`
@@ -1934,9 +1949,14 @@ function libraryEntries() {
   if (prefs.libSort === 'alpha') rows = [...rows].sort((x, y) => x.name.localeCompare(y.name));
   return rows;
 }
+const PIN_KEY='soundwave-library-pins-v1';
+function libraryPinnedIds(){try{return new Set(JSON.parse(localStorage.getItem(PIN_KEY)||'[]'))}catch{return new Set()}}
+function toggleLibraryPin(key){const pins=libraryPinnedIds();pins.has(key)?pins.delete(key):pins.add(key);localStorage.setItem(PIN_KEY,JSON.stringify([...pins]));renderLibraryList();}
+document.addEventListener('click',e=>{const b=e.target.closest?.('.album-pin-control[data-pin-key]');if(!b)return;e.preventDefault();e.stopPropagation();toggleLibraryPin(b.dataset.pinKey);b.setAttribute('aria-label',libraryPinnedIds().has(b.dataset.pinKey)?'Unpin album':'Pin album');b.title=b.getAttribute('aria-label');});
 function libraryListHtml() {
   const f = state.libFilter, q = (state.libQuery || '').trim().toLowerCase(), grid = prefs.libView === 'grid';
   const item = (cls, art, name, metaHtml, attrs, active) => `<button type="button" class="library-item ${cls} ${active ? 'active' : ''}" ${attrs} title="${esc(name)}">${art}<span class="library-item-label"><strong>${esc(name)}</strong><small>${metaHtml}</small></span></button>`;
+  const pinned=libraryPinnedIds();
   const parts = [];
   // Liked Songs is always pinned first, exactly like Spotify.
   if ((f === 'all' || f === 'playlists') && (!q || 'liked songs'.includes(q))) {
@@ -1946,7 +1966,15 @@ function libraryListHtml() {
   if ((f === 'all' || f === 'playlists') && (!q || 'your top songs of the week'.includes(q) || 'your top songs'.includes(q))) {
     parts.push(item('weekly pinned', `<span class="library-art weekly-art">${icon('music')}</span>`, 'Your Top Songs', `<span class="pin-ico">${icon('pin')}</span>Auto playlist · ${state.personalTopSongs.length} songs`, 'data-nav="top-songs"', state.page === 'top-songs'));
   }
-  libraryEntries().forEach((e) => parts.push(item(e.cls, e.art, e.name, esc(e.meta), e.attrs, e.active)));
+  const libEntries=libraryEntries();
+  const pinKey=e=>{const attrs=e.attrs||'';const p=attrs.match(/data-openplaylist="(\d+)"/);if(p)return 'playlist:'+p[1];const a=attrs.match(/data-open-album="(\d+)"/);return a?'album:'+a[1]:null;};
+  const ordered=[...libEntries].sort((a,b)=>Number(pinned.has(pinKey(b)))-Number(pinned.has(pinKey(a))));
+  ordered.forEach(e=>{
+    const key=pinKey(e);
+    if(!key){parts.push(item(e.cls,e.art,e.name,esc(e.meta),e.attrs,e.active));return;}
+    const on=pinned.has(key);
+    parts.push(`<div class="library-pin-row ${on?'is-pinned':''}">${item(e.cls,e.art,e.name,`${on?'<span class="pin-ico">'+icon('pin')+'</span>':''}${esc(e.meta)}`,e.attrs,e.active)}<button class="library-pin-action" type="button" data-pin-key="${key}" aria-label="${on?'Unpin':'Pin'} ${esc(e.name)}" title="${on?'Unpin':'Pin'} ${esc(e.name)}">${icon('pin')}</button></div>`);
+  });
   if (parts.length === ((f === 'all' || f === 'playlists') && (!q || 'liked songs'.includes(q)) ? 1 : 0) && !libraryEntries().length) {
     if (q) return parts.join('') + `<div class="library-empty"><strong>Couldn’t find “${esc(state.libQuery)}”</strong><p>Try searching again using a different spelling or keyword.</p></div>`;
     if (f === 'artists') return `<div class="library-empty-card"><strong>Follow your first artist</strong><p>Follow artists you like and they’ll show up here.</p><button type="button" class="button sm" data-nav="artists">Browse artists</button></div>`;
@@ -1977,6 +2005,7 @@ function bindLibrary() {
   const sb = document.querySelector('.sidebar'); if (!sb) return;
   bindContent(sb); bindMusic(sb);
   sb.querySelector('.sidebar-motion-indicator')?.remove();
+  sb.querySelectorAll('[data-pin-key]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleLibraryPin(b.dataset.pinKey);});
   sb.querySelectorAll('[data-create-playlist]').forEach((b) => b.onclick = () => action(quickCreatePlaylist));
   sb.querySelectorAll('[data-create-show]').forEach((b) => b.onclick = openCreateShow);
   sb.querySelectorAll('[data-lib-filter]').forEach((b) => b.onclick = () => { state.libFilter = state.libFilter === b.dataset.libFilter ? 'all' : b.dataset.libFilter; renderLibraryList(); });
@@ -3073,14 +3102,30 @@ async function acceptPendingPlaylistInvite(){
 }
 async function ensureOAuthProfile(user){
   if(!user?.id)return;
-  const existing=await db.from('users').select('user_id').eq('user_id',user.id).maybeSingle();
-  if(existing.error && existing.error.code!=='PGRST116') console.warn('Could not check OAuth profile',existing.error);
-  if(existing.data)return;
+  const existing=await db.from('users').select('user_id,account_type').eq('user_id',user.id).maybeSingle();
+  if(existing.error && existing.error.code!=='PGRST116')throw existing.error;
+  if(existing.data){sessionStorage.removeItem('soundwave-google-registration');return;}
+  let intent=null;
+  try{intent=JSON.parse(sessionStorage.getItem('soundwave-google-registration')||'null');}catch{}
+  const role=intent?.role==='Artist'?'Artist':'Listener';
   const meta=user.user_metadata||{};
-  const display=String(meta.full_name||meta.name||user.email?.split('@')[0]||'SoundWave Listener').trim().slice(0,100);
-  const payload={user_id:user.id,display_name:display||'SoundWave Listener',account_type:'Listener',is_active:true};
+  const display=String(meta.full_name||meta.name||user.email?.split('@')[0]||'SoundWave User').trim().slice(0,90);
+  const payload={user_id:user.id,display_name:display||'SoundWave User',account_type:role,is_active:true};
   const created=await db.from('users').insert(payload);
-  if(created.error && !/duplicate|already exists|23505/i.test(String(created.error.message||''))) console.warn('Could not create OAuth listener profile',created.error);
+  if(created.error){
+    if(/23505|duplicate|already exists/i.test(String(created.error.message||'')))return;
+    throw new Error('Google sign-in succeeded, but the account could not be created: '+created.error.message);
+  }
+  if(role==='Artist'){
+    const artistName=String(intent?.artistName||display||'').trim().slice(0,100);
+    const found=await db.from('artist').select('artist_id').eq('user_id',user.id).maybeSingle();
+    if(found.error && found.error.code!=='PGRST116')throw found.error;
+    if(!found.data){
+      const added=await db.from('artist').insert({user_id:user.id,artist_name:artistName,is_active:true});
+      if(added.error)throw new Error('Your Google account was created, but Artist Studio setup needs attention: '+added.error.message);
+    }
+  }
+  sessionStorage.removeItem('soundwave-google-registration');
 }
 async function waitForAuthSession(timeoutMs=7000){
   const started=Date.now();
@@ -3213,7 +3258,7 @@ function albumDetail() {
   void ensureAlbumStreamCounts(al);
   state.tint = tintFor(al.album_id);
   shell(`<header class="coll-hero"><div class="coll-cover">${albumArt({ song_id: al.album_id, album: al }, 'large')}</div><div class="coll-meta"><span class="coll-kind">${esc(al.release_type||'Album')}</span><h1 class="coll-title">${esc(al.title)}</h1>${al.description?`<p class="coll-desc">${esc(al.description)}</p>`:''}<p class="coll-sub">${owner ? `<a href="#/artist-detail/${owner.artist_id}" data-open-artist="${owner.artist_id}"><strong>${esc(owner.artist_name)}</strong></a> · ` : ''}${yearOf(al.release_date) ? yearOf(al.release_date) + ' · ' : ''}${al.songs.length} ${al.songs.length === 1 ? 'song' : 'songs'}, ${total}</p></div></header>
-<div class="coll-actions"><button type="button" class="sw-big-play" data-play-ids="${ids(al.songs).join(',')}" aria-label="Play ${esc(al.title)}">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button></div>
+<div class="coll-actions"><button type="button" class="sw-big-play" data-play-ids="${ids(al.songs).join(',')}" aria-label="Play ${esc(al.title)}">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button><button type="button" class="sw-quiet-action album-pin-control" data-pin-key="album:${al.album_id}" aria-label="${libraryPinnedIds().has('album:'+al.album_id)?'Unpin':'Pin'} album" title="${libraryPinnedIds().has('album:'+al.album_id)?'Unpin':'Pin'} album">${icon('pin')}</button></div>
 ${canSeeStreams ? `<p class="muted small album-stream-note">Visible qualified streams per song${state.albumStreamLoading[al.album_id] ? ' · updating…' : ''}</p>` : ''}
 ${trackTable(al.songs, { queue: ids(al.songs), showAlbum: false, extraLabel: canSeeStreams ? 'Streams' : '', extraClass: 'streams', extraCell: canSeeStreams ? ((song) => `<span class="stream-pill">${compactNumber(songVisibleStreamCount(song.song_id))}</span>`) : null })}
 ${(() => { const more = catalogAlbums().filter((a) => a.album_id !== al.album_id && Number(a.artist?.artist_id) === Number(owner?.artist_id)); return more.length ? `<section class="shelf-section"><div class="section-heading"><h2>More by ${esc(owner.artist_name)}</h2></div><div class="shelf">${more.map(albumTile).join('')}</div></section>` : ''; })()}`, '', '');
