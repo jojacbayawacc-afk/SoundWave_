@@ -99,7 +99,7 @@ function persistPlayerSnapshot(data = state.player, resumeAt = null) {
     savedAt: new Date().toISOString()
   });
 }
-Object.assign(state,{insightHistory:[],listeningStats:null,topWeekSongs:[],friendActivity:[],friendNow:[],artistThirtyDay:[],artistTopListeners:[],adminAnalyticsHistory:[],analyticsSongNames:{},artistPopularity:{},recentSearches:[],playlistPresence:[],competitionLoaded:false,podcastStudioHistory:[],podcastRecSignals:{categories:{},shows:[]},discoverExpanded:{albums:false,curated:false}});
+Object.assign(state,{insightHistory:[],listeningStats:null,topWeekSongs:[],personalTopSongs:[],topSongsLoading:false,friendActivity:[],friendNow:[],artistThirtyDay:[],artistTopListeners:[],adminAnalyticsHistory:[],analyticsSongNames:{},artistPopularity:{},recentSearches:[],playlistPresence:[],competitionLoaded:false,podcastStudioHistory:[],podcastRecSignals:{categories:{},shows:[]},discoverExpanded:{albums:false,curated:false}});
 const nice = (n) => Number.isFinite(Number(n)) ? `${Math.floor(n/60)}:${String(Math.floor(n%60)).padStart(2,'0')}` : '—';
 const ANALYTICS_WINDOW_DAYS = 30;
 const val = (id) => document.getElementById(id)?.value?.trim();
@@ -160,7 +160,7 @@ async function resolveCoverUrl(value){
 }
 
 // ---------- Routing (URL <-> state) so refresh, deep links and the browser Back button all work ----------
-const ROUTES = ['not-found','discover','home', 'listener-dashboard', 'artist-dashboard', 'admin-dashboard', 'music', 'artists', 'artist-detail', 'album-detail', 'liked-artists', 'liked-songs', 'followers', 'profile', 'playlists', 'history', 'downloads', 'podcasts', 'podcast-studio', 'plans', 'studio', 'admin'];
+const ROUTES = ['not-found','discover','home', 'listener-dashboard', 'artist-dashboard', 'admin-dashboard', 'music', 'artists', 'artist-detail', 'album-detail', 'liked-artists', 'liked-songs', 'top-songs', 'followers', 'profile', 'playlists', 'history', 'downloads', 'podcasts', 'podcast-studio', 'plans', 'studio', 'admin'];
 function pageToHash() {
   const p = state.page;
   const id = p === 'playlists' ? state.selectedPlaylist : p === 'artist-detail' ? state.selectedArtist : p === 'album-detail' ? state.selectedAlbum : p === 'podcasts' ? state.selectedShow : null;
@@ -521,6 +521,7 @@ function navigate(page, extras = {}) {
   state.karaokeMode=false;
   document.body.classList.toggle('karaoke-mode', Boolean(state.karaokeMode && state.player?.kind==='song'));
   render();
+  if (page === 'top-songs') void refreshPersonalTopSongs();
   if (page === 'artist-detail') void refreshViewedArtistCover(state.selectedArtist);
   const main = document.getElementById('main-content'); if (main) main.scrollTop = 0;
   if (page === 'artist-detail' && state.selectedArtist) {
@@ -1176,7 +1177,7 @@ async function refreshStreamMetrics(){
     const hist=await db.from('listening_history').select('stream_id,user_id,song_id,stream_date,duration_played_seconds,completion_status').eq('user_id',state.user.id).gte('stream_date',since90).order('stream_date',{ascending:false}).limit(1500);
     if(!hist.error){
       state.insightHistory=mergeStreamHistory(hist.data||[], readCachedHistory());
-      state.listeningStats=computeListeningStats(state.insightHistory);
+      state.listeningStats=computeListeningStats(state.insightHistory);state.personalTopSongs=rankedPersonalTopSongs(state.insightHistory);
       const weekCut=now-7*86400000,counts=new Map();
       state.insightHistory.filter(r=>new Date(r.stream_date).getTime()>=weekCut).forEach(r=>counts.set(Number(r.song_id),(counts.get(Number(r.song_id))||0)+1));
       state.topWeekSongs=[...counts.entries()].sort((a,b)=>b[1]-a[1]).map(([id])=>songById(id)).filter(Boolean).slice(0,20);
@@ -1942,8 +1943,8 @@ function libraryListHtml() {
     const meta = state.likesAvailable ? `${state.liked.length} ${state.liked.length === 1 ? 'song' : 'songs'}` : 'Set up needed';
     parts.push(item('liked pinned', `<span class="library-art liked-art">${icon('heart')}</span>`, 'Liked Songs', `<span class="pin-ico">${icon('pin')}</span>Playlist · ${meta}`, 'data-nav="liked-songs"', state.page === 'liked-songs'));
   }
-  if ((f === 'all' || f === 'playlists') && state.topWeekSongs.length && (!q || 'your top songs of the week'.includes(q))) {
-    parts.push(item('weekly pinned', `<span class="library-art weekly-art">${icon('music')}</span>`, 'Your Top Songs of the Week', `<span class="pin-ico">${icon('pin')}</span>Auto playlist · ${state.topWeekSongs.length} songs`, `data-play-ids="${state.topWeekSongs.map(x=>x.song_id).join(',')}"`, false));
+  if ((f === 'all' || f === 'playlists') && (!q || 'your top songs of the week'.includes(q) || 'your top songs'.includes(q))) {
+    parts.push(item('weekly pinned', `<span class="library-art weekly-art">${icon('music')}</span>`, 'Your Top Songs', `<span class="pin-ico">${icon('pin')}</span>Auto playlist · ${state.personalTopSongs.length} songs`, 'data-nav="top-songs"', state.page === 'top-songs'));
   }
   libraryEntries().forEach((e) => parts.push(item(e.cls, e.art, e.name, esc(e.meta), e.attrs, e.active)));
   if (parts.length === ((f === 'all' || f === 'playlists') && (!q || 'liked songs'.includes(q)) ? 1 : 0) && !libraryEntries().length) {
@@ -1975,11 +1976,7 @@ function openCreateShow() { navigate('podcasts'); setTimeout(() => document.getE
 function bindLibrary() {
   const sb = document.querySelector('.sidebar'); if (!sb) return;
   bindContent(sb); bindMusic(sb);
-  let motion=sb.querySelector('.sidebar-motion-indicator');
-  if(motion)motion.remove(); motion=null;
-  const moveIndicator=(item)=>{if(!item||!motion)return;const sr=sb.getBoundingClientRect(),ir=item.getBoundingClientRect();motion.style.top=`${Math.max(0,ir.top-sr.top)}px`;motion.style.height=`${Math.max(34,ir.height)}px`;motion.classList.add('visible');};
-  const activeItem=sb.querySelector('.library-item.active');if(activeItem)requestAnimationFrame(()=>moveIndicator(activeItem));
-  sb.addEventListener('click',(e)=>{const item=e.target.closest('.library-item,.filter-pill,.sidebar-role,.library-toggle');if(!item)return;item.classList.remove('sidebar-click-pop');void item.offsetWidth;item.classList.add('sidebar-click-pop');moveIndicator(item);setTimeout(()=>item.classList.remove('sidebar-click-pop'),420);},{capture:true});
+  sb.querySelector('.sidebar-motion-indicator')?.remove();
   sb.querySelectorAll('[data-create-playlist]').forEach((b) => b.onclick = () => action(quickCreatePlaylist));
   sb.querySelectorAll('[data-create-show]').forEach((b) => b.onclick = openCreateShow);
   sb.querySelectorAll('[data-lib-filter]').forEach((b) => b.onclick = () => { state.libFilter = state.libFilter === b.dataset.libFilter ? 'all' : b.dataset.libFilter; renderLibraryList(); });
@@ -3043,6 +3040,7 @@ function render() {
     case 'album-detail': albumDetail(); break;
     case 'liked-artists': likedArtists(); break;
     case 'liked-songs': likedSongsPage(); break;
+    case 'top-songs': topSongsPage(); break;
     case 'followers': followers(); break;
     case 'profile': profile(); break;
     case 'playlists': playlists(); break;
@@ -3219,6 +3217,39 @@ function albumDetail() {
 ${canSeeStreams ? `<p class="muted small album-stream-note">Visible qualified streams per song${state.albumStreamLoading[al.album_id] ? ' · updating…' : ''}</p>` : ''}
 ${trackTable(al.songs, { queue: ids(al.songs), showAlbum: false, extraLabel: canSeeStreams ? 'Streams' : '', extraClass: 'streams', extraCell: canSeeStreams ? ((song) => `<span class="stream-pill">${compactNumber(songVisibleStreamCount(song.song_id))}</span>`) : null })}
 ${(() => { const more = catalogAlbums().filter((a) => a.album_id !== al.album_id && Number(a.artist?.artist_id) === Number(owner?.artist_id)); return more.length ? `<section class="shelf-section"><div class="section-heading"><h2>More by ${esc(owner.artist_name)}</h2></div><div class="shelf">${more.map(albumTile).join('')}</div></section>` : ''; })()}`, '', '');
+}
+function rankedPersonalTopSongs(rows){
+  const scores=new Map();
+  for(const r of rows||[]){
+    const id=Number(r.song_id);
+    if(!id || !(String(r.completion_status||'').toLowerCase()==='completed' || Number(r.duration_played_seconds||0)>=30)) continue;
+    const s=songById(id);if(!s||s.is_active===false||s.album?.is_active===false)continue;
+    const current=scores.get(id)||{song:s,plays:0,last:0};
+    current.plays++;
+    current.last=Math.max(current.last,Date.parse(r.stream_date)||0);
+    scores.set(id,current);
+  }
+  return [...scores.values()].sort((a,b)=>b.plays-a.plays||b.last-a.last).slice(0,50);
+}
+async function refreshPersonalTopSongs(){
+  if(!state.user||state.topSongsLoading)return;
+  state.topSongsLoading=true;
+  try{
+    const response=await db.from('listening_history')
+      .select('stream_id,song_id,stream_date,duration_played_seconds,completion_status')
+      .eq('user_id',state.user.id).order('stream_date',{ascending:false}).limit(5000);
+    if(response.error)throw response.error;
+    state.personalTopSongs=rankedPersonalTopSongs(response.data||[]);
+  }catch(error){console.warn('Could not load personal top songs',error);state.personalTopSongs=rankedPersonalTopSongs(state.insightHistory||state.history||[]);}
+  finally {state.topSongsLoading=false;}
+  if(state.page==='top-songs'){topSongsPage();renderLibraryList();}
+}
+function topSongsPage(){
+  const ranked=state.personalTopSongs||[],songs=ranked.map(x=>x.song),display=state.profile?.display_name||'You';
+  state.tint='#1f5c4d';
+  shell(`<header class="coll-hero"><div class="coll-cover top-songs-cover">${icon('music')}</div><div class="coll-meta"><span class="coll-kind">Your listening history</span><h1 class="coll-title">Your Top Songs</h1><p class="coll-sub"><span class="sw-owner-avatar">${esc(display[0]?.toUpperCase()||'S')}</span><strong>${esc(display)}</strong> · ${songs.length} tracks ranked by your qualified plays</p></div></header>
+    <div class="coll-actions">${songs.length?`<button type="button" class="sw-big-play" data-play-ids="${ids(songs).join(',')}" aria-label="Play your most played songs">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button>`:''}</div>
+    ${songs.length?`<p class="muted small">Ranked by your own completed plays or listens of at least 30 seconds.</p>${trackTable(songs,{queue:ids(songs),showAlbum:true,extraLabel:'Your plays',extraClass:'streams',extraCell:(song)=>`<span class="stream-pill">${ranked.find(x=>Number(x.song.song_id)===Number(song.song_id))?.plays||0}</span>`})}`:`<div class="empty-state"><h3>${state.topSongsLoading?'Loading your top songs…':'No qualified plays yet'}</h3><p>Listen to songs for at least 30 seconds or finish them to build your personal ranking.</p><button class="button" type="button" data-nav="discover">Discover songs</button></div>`}`,'','');
 }
 function likedSongsPage() {
   const songs = state.liked.map((x) => songById(x.song_id)).filter(Boolean);
