@@ -1958,6 +1958,30 @@ const PIN_KEY='soundwave-library-pins-v1';
 function libraryPinnedIds(){try{const values=JSON.parse(localStorage.getItem(PIN_KEY)||'[]');return new Set(Array.isArray(values)?values:[])}catch{return new Set()}}
 function toggleLibraryPin(key){const pins=libraryPinnedIds();pins.has(key)?pins.delete(key):pins.add(key);localStorage.setItem(PIN_KEY,JSON.stringify([...pins]));renderLibraryList();}
 document.addEventListener('click',e=>{const b=e.target.closest?.('.album-pin-control[data-pin-key]');if(!b)return;e.preventDefault();e.stopPropagation();toggleLibraryPin(b.dataset.pinKey);b.setAttribute('aria-label',libraryPinnedIds().has(b.dataset.pinKey)?'Unpin album':'Pin album');b.title=b.getAttribute('aria-label');});
+// A single right-click action for library entries. Keep the pin button in DOM for keyboard fallback.
+let libraryContextMenu=null;
+function dismissLibraryContextMenu(){libraryContextMenu?.remove();libraryContextMenu=null;}
+document.addEventListener('contextmenu',event=>{
+ const entry=event.target.closest?.('.sidebar .library-pin-row');
+ if(!entry)return;
+ const button=entry.querySelector('.library-pin-action[data-pin-key]');
+ if(!button)return;
+ event.preventDefault();dismissLibraryContextMenu();
+ const key=button.dataset.pinKey;
+ const unpin=key.endsWith(':unpinned')?!libraryPinnedIds().has(key):libraryPinnedIds().has(key);
+ const label=unpin?'Unpin from library':'Pin to library';
+ const menu=document.createElement('div');menu.className='library-context-menu';menu.setAttribute('role','menu');
+ const option=document.createElement('button');option.type='button';option.setAttribute('role','menuitem');option.textContent=label;
+ option.addEventListener('click',e=>{e.stopPropagation();dismissLibraryContextMenu();toggleLibraryPin(key);});
+ menu.append(option);document.body.append(menu);libraryContextMenu=menu;
+ const rect=menu.getBoundingClientRect();
+ menu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-rect.width-8))+'px';
+ menu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-rect.height-8))+'px';
+ option.focus();
+});
+document.addEventListener('pointerdown',event=>{if(libraryContextMenu&&!libraryContextMenu.contains(event.target))dismissLibraryContextMenu();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')dismissLibraryContextMenu();});
+
 function libraryListHtml() {
   const f = state.libFilter, q = (state.libQuery || '').trim().toLowerCase(), grid = prefs.libView === 'grid';
   const item = (cls, art, name, metaHtml, attrs, active) => `<button type="button" class="library-item ${cls} ${active ? 'active' : ''}" ${attrs} title="${esc(name)}">${art}<span class="library-item-label"><strong>${esc(name)}</strong><small>${metaHtml}</small></span></button>`;
