@@ -603,11 +603,11 @@ async function syncKaraokePanel(){
  document.body.classList.toggle('karaoke-mode',Boolean(state.karaokeMode && state.player?.kind==='song'));
  if(!document.body.classList.contains('karaoke-mode'))return;
  const panel=document.createElement('section');panel.className='karaoke-panel';panel.setAttribute('aria-label','Karaoke lyrics');
- const heading=document.createElement('h2');heading.textContent=state.player.title||'Karaoke';
+ const heading=document.createElement('div');heading.className='karaoke-heading';heading.innerHTML='<span class="karaoke-kicker">KARAOKE</span><h2></h2><button type="button" class="karaoke-exit" data-karaoke-toggle aria-label="Exit karaoke">Exit karaoke</button>';heading.querySelector('h2').textContent=state.player.title||'Karaoke';
  const lines=document.createElement('div');lines.className='karaoke-lines';lines.textContent='Loading lyrics…';panel.append(heading,lines);main.append(panel);
  const songId=state.player.id;
  const lyrics=await ensureLyricsLoaded(songId);
- if(panel.isConnected && state.player?.id===songId)lines.textContent=lyrics||'No lyrics available for this song.';
+ if(panel.isConnected && state.player?.id===songId){lines.textContent=lyrics||'Lyrics aren’t available for this track yet.';lines.classList.toggle('karaoke-empty',!lyrics); }
 }
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-karaoke-toggle]'))return;e.preventDefault();state.karaokeMode=!state.karaokeMode;state.railTab=state.karaokeMode?'now':state.railTab;document.querySelectorAll('[data-karaoke-toggle]').forEach(b=>b.setAttribute('aria-pressed',String(state.karaokeMode)));void syncKaraokePanel();});
 
@@ -621,7 +621,7 @@ document.addEventListener('click',async e=>{
  document.getElementById('mobile-now-playing')?.classList.toggle('show-lyrics',state.mobileLyricsOpen);
  if(state.mobileLyricsOpen&&state.player?.kind==='song'){
   const id=state.player.id,lines=panel.querySelector('#mobile-now-lyrics-content');
-  const lyrics=await ensureLyricsLoaded(id);if(lines&&state.player?.id===id)lines.textContent=lyrics||'Lyrics are not available for this song.';
+  const lyrics=await ensureLyricsLoaded(id);if(lines&&state.player?.id===id)lines.textContent=lyrics||'Lyrics haven’t been added to this track yet.';
  }
 });
 
@@ -1802,7 +1802,7 @@ function discoverPage(){
   const showPodcasts=filter==='all'||filter==='podcasts';
   const expandBtn=(key,expanded,canExpand)=>canExpand?`<button type="button" class="text-link" data-discover-showall="${key}">${expanded?'Show less':'Show all'}</button>`:'';
   const musicSections=showMusic?`${shelf('Available Albums','Active releases from across SoundWave',expandBtn('albums',albumsExpanded,available.length>7),available.length?`<div class="shelf ${albumsExpanded?'wrap discover-expanded':''}">${visibleAlbums.map(albumTile).join('')}</div>`:'<div class="empty discover-empty"><span>▣</span><h3>No albums are available yet</h3><p>Active releases will appear here as artists publish them.</p></div>')}
-  ${shelf('Curated for you','Recommendations shaped by your listening signals','',curated.length?`<div class="shelf curated-slider">${curated.map(curatedTile).join('')}</div>`:'<div class="empty discover-empty"><span>✦</span><h3>Your recommendations are warming up</h3><p>Play music, like tracks and follow artists to personalize this shelf.</p><button class="button secondary" data-nav="music">Find music</button></div>')}
+  ${shelf('Curated for you','Recommendations shaped by your listening signals',curated.length>1?`<div class="curated-slider-controls"><button type="button" data-curated-slide="prev" aria-label="Previous recommendations" title="Previous" disabled>${icon('back')}</button><button type="button" data-curated-slide="next" aria-label="Next recommendations" title="Next">${icon('forward')}</button></div>`:'',curated.length?`<div class="shelf curated-slider" id="curated-slider" aria-label="Curated recommendations">${curated.map(curatedTile).join('')}</div>`:'<div class="empty discover-empty"><span>✦</span><h3>Your recommendations are warming up</h3><p>Play music, like tracks and follow artists to personalize this shelf.</p><button class="button secondary" data-nav="music">Find music</button></div>')}
   ${shelf('New releases','Fresh releases from the last 60 days','<button type="button" class="text-link" data-nav="music">Browse catalog</button>',fresh.length?`<div class="shelf">${fresh.map(albumTile).join('')}</div>`:'<div class="empty discover-empty"><span>◷</span><h3>No fresh releases in the last 60 days</h3><p>Check Available Albums above for the full active catalog.</p></div>')}
   ${shelf('Popular artists',state.socialRpc?.counts?'Ranked by verified follower count':'Follower ranking unavailable until follower-count data loads','<button type="button" class="text-link" data-nav="artists">Show all</button>',popular.length?`<div class="shelf popular-artist-shelf">${popular.map((a,i)=>artistCard(a,i,{showFollowers:true,rank:i+1})).join('')}</div>`:'<div class="empty discover-empty"><span>◎</span><h3>Artists will appear here</h3><p>Follower activity will rank artists as the community grows.</p></div>')}`:'';
   const podcastSubtitle=(Object.keys(state.podcastRecSignals?.categories||{}).length||state.podcastRecSignals?.shows?.length)?'Based on the podcast categories and shows you listen to':'Active shows to help you start discovering podcasts';
@@ -3113,8 +3113,8 @@ function queueRow(item, idx) {
   return `<button type="button" class="queue-row ${idx == null ? 'current' : ''}" ${idx != null ? `data-queue-jump="${idx}"` : ''}><span class="queue-art">${item.song ? albumArt(item.song, 'tiny') : `<span class="placeholder-art tiny">${icon('mic')}</span>`}</span><span class="queue-text"><strong>${esc(item.title)}</strong><small>${esc(item.artist)}</small></span></button>`;
 }
 function railHtml() {
-  const p = state.player, tab = state.railTab;
-  const head = `<div class="rail-title"><h2>${tab === 'queue' ? 'Queue' : tab === 'lyrics' ? 'Lyrics' : 'Now playing'}</h2><div class="rail-tools">${p?.kind==='song'?`<button type="button" class="icon-quiet ${tab === 'lyrics' ? 'active' : ''}" data-rail-tab="lyrics" aria-label="Show lyrics" title="Lyrics">${icon('music')}</button>`:''}<button type="button" class="icon-quiet ${tab === 'queue' ? 'active' : ''}" data-rail-tab="queue" aria-label="Show queue" title="Queue">${icon('queue')}</button><button type="button" id="close-rail" class="icon-quiet" aria-label="Hide this panel" title="Hide">${icon('close')}</button></div></div>`;
+  const p = state.player, tab = state.railTab === 'lyrics' ? 'now' : state.railTab;
+  const head = `<div class="rail-title"><h2>${tab === 'queue' ? 'Queue' : tab === 'lyrics' ? 'Lyrics' : 'Now playing'}</h2><div class="rail-tools"><button type="button" class="icon-quiet ${tab === 'queue' ? 'active' : ''}" data-rail-tab="queue" aria-label="Show queue" title="Queue">${icon('queue')}</button><button type="button" id="close-rail" class="icon-quiet" aria-label="Hide this panel" title="Hide">${icon('close')}</button></div></div>`;
   if (!p) return `${head}<div class="now-card empty-now"><span class="now-art placeholder">${icon('music')}</span><h3>Nothing playing</h3><p class="muted">Pick a song and its details will show up here.</p></div>${friendNowHtml()}${friendActivityHtml()}`;
   const song = p.kind === 'song' ? songById(p.id) : null;
   const current = { song, title: p.title, artist: p.artist };
@@ -3240,4 +3240,26 @@ boot();
     card.style.setProperty('--rx', '0deg');
     card.style.setProperty('--ry', '0deg');
   });
+})();
+
+
+// Curated carousel: accessible buttons that reveal the next/previous visible cards.
+(function bindCuratedCarousel(){
+  function update(){
+    const rail=document.getElementById('curated-slider');if(!rail)return;
+    const prev=document.querySelector('[data-curated-slide="prev"]'),next=document.querySelector('[data-curated-slide="next"]');
+    if(prev)prev.disabled=rail.scrollLeft<=3;
+    if(next)next.disabled=rail.scrollLeft+rail.clientWidth>=rail.scrollWidth-3;
+  }
+  document.addEventListener('click',event=>{
+    const b=event.target.closest?.('[data-curated-slide]');if(!b)return;
+    const rail=document.getElementById('curated-slider');if(!rail)return;
+    event.preventDefault();
+    const card=rail.querySelector('.curated-card');
+    const distance=Math.max(card?.getBoundingClientRect().width||180, Math.floor(rail.clientWidth*0.8));
+    rail.scrollBy({left:(b.dataset.curatedSlide==='prev'?-1:1)*distance,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    setTimeout(update,340);
+  });
+  document.addEventListener('scroll',event=>{if(event.target?.id==='curated-slider')update();},true);
+  new MutationObserver(()=>{if(document.getElementById('curated-slider'))requestAnimationFrame(update);}).observe(document.body,{childList:true,subtree:true});
 })();
