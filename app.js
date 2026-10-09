@@ -588,7 +588,7 @@ document.addEventListener('click',event=>{
 
 
 // FR-01: karaoke surface lives in the main dashboard region, not the right rail.
-Object.assign(state,{karaokeMode:false,mobileLyricsOpen:false});
+Object.assign(state,{karaokeMode:false,mobileLyricsOpen:false,mobileQueueOpen:false});
 async function ensureLyricsLoaded(songId){
  if(!songId)return '';
  if(Object.prototype.hasOwnProperty.call(state.lyricsCache,songId))return state.lyricsCache[songId];
@@ -597,13 +597,26 @@ async function ensureLyricsLoaded(songId){
  const lyrics=String(result.data?.lyrics_text??result.data?.lyrics??result.data?.content??'');
  state.lyricsCache[songId]=lyrics;return lyrics;
 }
+function mobileQueueRowHtml(song, idx = null){
+ if(!song)return '';
+ const action = idx == null ? ' aria-current="true"' : ` data-mobile-queue-jump="${idx}"`;
+ const label = idx == null ? '<small>Now playing</small>' : `<small>Tap to play next #${idx + 1}</small>`;
+ return `<button type="button" class="mobile-queue-row ${idx == null ? 'current' : ''}"${action}><span class="mobile-queue-art">${albumArt(song,'tiny')}</span><span class="mobile-queue-copy"><strong>${esc(song.song_title || 'Unknown track')}</strong><span>${esc(song.album?.artist?.artist_name || 'SoundWave')}</span>${label}</span></button>`;
+}
+function mobileQueueMarkup(){
+ const p = state.player;
+ if(!p || p.kind !== 'song') return '<p class="muted small">Nothing queued yet.</p>';
+ const current = songById(p.id);
+ const up = (p.order || []).slice((p.pos || 0) + 1).map((id, offset) => ({ s: songById(id), idx: (p.pos || 0) + 1 + offset })).filter((x) => x.s && x.s.is_active !== false);
+ return `<div class="mobile-queue-group"><h3>Now playing</h3>${current ? mobileQueueRowHtml(current, null) : '<p class="muted small">No current song.</p>'}</div><div class="mobile-queue-group"><h3>Next up</h3>${up.length ? up.slice(0, 40).map((x) => mobileQueueRowHtml(x.s, x.idx)).join('') : '<p class="muted small">Nothing else in the queue yet.</p>'}</div>`;
+}
 async function syncKaraokePanel(){
  const main=document.getElementById('main-content');if(!main)return;
  main.querySelector('.karaoke-panel')?.remove();
  document.body.classList.toggle('karaoke-mode',Boolean(state.karaokeMode && state.player?.kind==='song'));
  if(!document.body.classList.contains('karaoke-mode'))return;
  const panel=document.createElement('section');panel.className='karaoke-panel';panel.setAttribute('aria-label','Karaoke lyrics');
- const heading=document.createElement('div');heading.className='karaoke-heading';heading.innerHTML='<span class="karaoke-kicker">KARAOKE</span><h2></h2><button type="button" class="karaoke-exit" data-karaoke-toggle aria-label="Exit karaoke">Exit karaoke</button>';heading.querySelector('h2').textContent=state.player.title||'Karaoke';
+ const heading=document.createElement('div');heading.className='karaoke-heading';heading.innerHTML='<span class="karaoke-kicker">KARAOKE MODE</span><h2></h2><small class="karaoke-subtitle"></small>';heading.querySelector('h2').textContent=state.player.title||'Karaoke';heading.querySelector('.karaoke-subtitle').textContent=state.player.artist||'';
  const lines=document.createElement('div');lines.className='karaoke-lines';lines.textContent='Loading lyrics…';panel.append(heading,lines);main.append(panel);
  const songId=state.player.id;
  const lyrics=await ensureLyricsLoaded(songId);
@@ -619,10 +632,37 @@ document.addEventListener('click',async e=>{
  const panel=document.getElementById('mobile-now-lyrics');if(!panel)return;
  panel.hidden=!state.mobileLyricsOpen;btn.setAttribute('aria-pressed',String(state.mobileLyricsOpen));
  document.getElementById('mobile-now-playing')?.classList.toggle('show-lyrics',state.mobileLyricsOpen);
+ if(state.mobileLyricsOpen){
+  state.mobileQueueOpen=false;
+  const qPanel=document.getElementById('mobile-now-queue'); if(qPanel) qPanel.hidden=true;
+  document.getElementById('mobile-now-playing')?.classList.remove('show-queue');
+ }
  if(state.mobileLyricsOpen&&state.player?.kind==='song'){
   const id=state.player.id,lines=panel.querySelector('#mobile-now-lyrics-content');
   const lyrics=await ensureLyricsLoaded(id);if(lines&&state.player?.id===id)lines.textContent=lyrics||'Lyrics haven’t been added to this track yet.';
  }
+});
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('#mobile-queue-toggle'); if(!btn) return;
+ e.preventDefault();
+ state.mobileQueueOpen=!state.mobileQueueOpen;
+ state.mobileLyricsOpen=false;
+ const root=document.getElementById('mobile-now-playing');
+ const panel=document.getElementById('mobile-now-queue');
+ const lyricsPanel=document.getElementById('mobile-now-lyrics');
+ if(panel){ panel.hidden=!state.mobileQueueOpen; const content=panel.querySelector('#mobile-now-queue-content'); if(content) content.innerHTML=mobileQueueMarkup(); }
+ if(lyricsPanel) lyricsPanel.hidden=true;
+ root?.classList.toggle('show-queue',state.mobileQueueOpen);
+ root?.classList.remove('show-lyrics');
+ btn.setAttribute('aria-pressed',String(state.mobileQueueOpen));
+ const lyricBtn=document.getElementById('mobile-lyrics-toggle'); if(lyricBtn) lyricBtn.setAttribute('aria-pressed','false');
+});
+document.addEventListener('click',e=>{
+ const row=e.target.closest?.('[data-mobile-queue-jump]'); if(!row) return;
+ e.preventDefault();
+ const p=state.player; if(!p || p.kind!=='song') return;
+ const idx=Number(row.dataset.mobileQueueJump);
+ action(() => playSong(p.order[idx], p.queue, { order: p.order, pos: idx }));
 });
 
 function goBack() { window.history.back(); }
@@ -805,7 +845,8 @@ function playerBarHtml(d) {
   const thumb = idle ? icon('music') : podcast ? icon('mic') : albumArt(song, 'tiny');
   const fullArt = podcast ? `<span class="mobile-now-placeholder">${icon('mic')}</span>` : albumArt(song, 'large');
   const contextLabel = podcast ? 'Playing podcast' : 'Now playing';
-  const mobileLyricsBtn= !idle&&!podcast ? `<button type="button" id="mobile-lyrics-toggle" class="mobile-now-icon" aria-pressed="${Boolean(state.mobileLyricsOpen)}" aria-label="View lyrics" title="Lyrics">${icon('music')}</button>` : '';
+  const mobileQuickActions = !idle&&!podcast ? `<div class="mobile-now-actions"><button type="button" id="mobile-queue-toggle" class="mobile-now-pill" aria-pressed="${Boolean(state.mobileQueueOpen)}" aria-label="Open queue">${icon('queue')}<span>Queue</span></button><button type="button" id="mobile-lyrics-toggle" class="mobile-now-pill" aria-pressed="${Boolean(state.mobileLyricsOpen)}" aria-label="Open lyrics">${icon('music')}<span>Lyrics</span></button></div>` : '';
+  const mobileQueuePanel = !idle&&!podcast ? `<section class="mobile-now-queue" id="mobile-now-queue" hidden><div class="mobile-now-sheet-head"><h3>Queue</h3></div><div id="mobile-now-queue-content">${mobileQueueMarkup()}</div></section>` : '';
   return `<div class="custom-playbar ${idle ? 'idle-playbar' : ''}">
  <div class="player-song"><div class="mobile-now-open" id="mobile-now-open" role="button" tabindex="0" aria-label="Open now playing details"><span class="player-thumb ${idle ? 'idle-thumb' : ''}">${thumb}</span><span class="player-song-text"><strong>${esc(d?.title || 'SoundWave')}</strong><small>${idle ? 'Choose something to play' : artistId ? `<a href="#/artist-detail/${artistId}" data-open-artist="${artistId}">${esc(d.artist)}</a>` : esc(d.artist)}</small></span></div>${song ? heartBtn(song.song_id, 'player-heart') : ''}</div>
  <div class="player-center"><div class="play-controls">
@@ -813,10 +854,11 @@ function playerBarHtml(d) {
   <button type="button" id="sw-prev" class="icon-quiet" aria-label="${podcast ? 'Back 15 seconds' : 'Previous song'}" title="${podcast ? 'Back 15 seconds' : 'Previous'}" ${dis}>${podcast ? '<span class="skip-15">−15</span>' : icon('prev')}</button>
   <span class="mini-visualizer" aria-hidden="true"><i></i><i></i><i></i><i></i></span><button type="button" id="sw-toggle" class="player-main-play" aria-label="${idle ? 'Play' : 'Pause'}" ${dis}>${icon(idle ? 'play' : 'pause')}</button>
   <button type="button" id="sw-next" class="icon-quiet" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}" title="${podcast ? 'Forward 15 seconds' : 'Next'}" ${dis}>${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button>
+  ${!idle&&!podcast?`<button type="button" id="sw-queue" class="icon-quiet transport-side-action ${state.railTab === 'queue' && !prefs.railHidden ? 'active' : ''}" aria-label="Queue" title="Queue">${icon('queue')}</button><button type="button" class="icon-quiet transport-side-action" data-karaoke-toggle aria-label="Toggle karaoke lyrics" aria-pressed="${Boolean(state.karaokeMode)}" title="Karaoke lyrics">${icon('mic')}</button>`:''}
   ${podcast ? '' : `<button type="button" id="sw-repeat" class="icon-quiet mode ${prefs.repeat !== 'off' ? 'active' : ''}" data-mode="${prefs.repeat}" aria-label="Repeat: ${prefs.repeat}" title="Repeat" ${dis}>${icon(prefs.repeat === 'one' ? 'repeat1' : 'repeat')}</button>`}
  </div><div class="player-timeline"><span id="sw-elapsed">0:00</span><input id="sw-seek" type="range" min="0" max="1000" value="0" style="--pct:0%" aria-label="Seek position" ${dis}><span id="sw-total">${nice(d?.duration || 0)}</span></div></div>
- <div class="player-right">${!idle&&!podcast?`<button type="button" class="icon-quiet" data-karaoke-toggle aria-label="Toggle karaoke lyrics" aria-pressed="${Boolean(state.karaokeMode)}" title="Karaoke lyrics">${icon('mic')}</button>`:''}<button type="button" id="sw-queue" class="icon-quiet ${state.railTab === 'queue' && !prefs.railHidden ? 'active' : ''}" aria-label="Queue" title="Queue">${icon('queue')}</button><button type="button" id="sw-mute" class="icon-quiet" aria-label="Mute" title="Mute">${icon(vol === 0 ? 'mute' : 'volume')}</button><input id="sw-volume" type="range" min="0" max="100" value="${vol}" style="--pct:${vol}%" aria-label="Volume"><button type="button" id="sw-view" class="icon-quiet ${prefs.railHidden ? '' : 'active'}" aria-label="Now playing view" title="Now playing view">${icon('library')}</button></div>
- ${idle ? '' : `<audio id="sw-audio" preload="metadata" src="${esc(d.url)}"></audio><section class="mobile-now-playing" id="mobile-now-playing" aria-hidden="true"><div class="mobile-now-bg" aria-hidden="true"></div><section class="mobile-now-lyrics" id="mobile-now-lyrics" hidden><h3>Lyrics</h3><div id="mobile-now-lyrics-content">Loading lyrics…</div></section><div class="mobile-now-head"><button type="button" id="mobile-now-close" class="mobile-now-icon" aria-label="Close now playing">${icon('back')}</button><strong>${contextLabel}</strong>${mobileLyricsBtn}<button type="button" class="mobile-now-icon" id="mobile-now-more" aria-label="Open queue">${icon('queue')}</button></div><div class="mobile-now-art">${fullArt}</div><div class="mobile-now-copy"><div><h2>${esc(d.title)}</h2><p>${esc(d.artist)}</p></div>${song ? heartBtn(song.song_id, 'mobile-now-heart') : ''}</div><div class="mobile-now-progress"><input id="mobile-now-seek" type="range" min="0" max="1000" value="0" aria-label="Seek position"><div><span id="mobile-now-elapsed">0:00</span><span id="mobile-now-total">${nice(d.duration || 0)}</span></div></div><div class="mobile-now-controls"><button type="button" id="mobile-now-prev" aria-label="${podcast ? 'Back 15 seconds' : 'Previous song'}">${podcast ? '<span class="skip-15">−15</span>' : icon('prev')}</button><button type="button" id="mobile-now-toggle" class="mobile-now-play" aria-label="Pause">${icon('pause')}</button><button type="button" id="mobile-now-next" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}">${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button></div></section>`}</div>`;
+ <div class="player-right"><button type="button" id="sw-mute" class="icon-quiet" aria-label="Mute" title="Mute">${icon(vol === 0 ? 'mute' : 'volume')}</button><input id="sw-volume" type="range" min="0" max="100" value="${vol}" style="--pct:${vol}%" aria-label="Volume"><button type="button" id="sw-view" class="icon-quiet ${prefs.railHidden ? '' : 'active'}" aria-label="Now playing view" title="Now playing view">${icon('library')}</button></div>
+ ${idle ? '' : `<audio id="sw-audio" preload="metadata" src="${esc(d.url)}"></audio><section class="mobile-now-playing" id="mobile-now-playing" aria-hidden="true"><div class="mobile-now-bg" aria-hidden="true"></div><section class="mobile-now-lyrics" id="mobile-now-lyrics" hidden><div class="mobile-now-sheet-head"><h3>Lyrics</h3></div><div id="mobile-now-lyrics-content">Loading lyrics…</div></section>${mobileQueuePanel}<div class="mobile-now-head"><button type="button" id="mobile-now-close" class="mobile-now-icon" aria-label="Close now playing">${icon('back')}</button><strong>${contextLabel}</strong><span class="mobile-now-spacer" aria-hidden="true"></span></div><div class="mobile-now-art">${fullArt}</div><div class="mobile-now-copy"><div><h2>${esc(d.title)}</h2><p>${esc(d.artist)}</p></div>${song ? heartBtn(song.song_id, 'mobile-now-heart') : ''}</div><div class="mobile-now-progress"><input id="mobile-now-seek" type="range" min="0" max="1000" value="0" aria-label="Seek position"><div><span id="mobile-now-elapsed">0:00</span><span id="mobile-now-total">${nice(d.duration || 0)}</span></div></div><div class="mobile-now-controls"><button type="button" id="mobile-now-prev" aria-label="${podcast ? 'Back 15 seconds' : 'Previous song'}">${podcast ? '<span class="skip-15">−15</span>' : icon('prev')}</button><button type="button" id="mobile-now-toggle" class="mobile-now-play" aria-label="Pause">${icon('pause')}</button><button type="button" id="mobile-now-next" aria-label="${podcast ? 'Forward 15 seconds' : 'Next song'}">${podcast ? '<span class="skip-15">+15</span>' : icon('next')}</button></div>${mobileQuickActions}</section>`}</div>`;
 }
 async function stopAudio() {
   const audio = document.getElementById('sw-audio');
@@ -956,13 +998,12 @@ function bindPlayerBar(audio, details, token) {
     try { if ('mediaSession' in navigator && dur() > 0) navigator.mediaSession.setPositionState({ duration: dur(), position: Math.min(audio.currentTime, dur()), playbackRate: audio.playbackRate }); } catch {}
   };
   $('#sw-toggle').onclick = () => { if (audio.paused) audio.play().catch((e) => toast(humanErr(e), true)); else audio.pause(); };
-  $('#mobile-now-open')?.addEventListener('click', (e) => { if (e.target.closest('.heart-btn') || e.target.closest('a')) return; const panel=$('#mobile-now-playing'); if(panel){panel.classList.add('open');panel.setAttribute('aria-hidden','false');document.body.classList.add('mobile-player-open');} });
+  $('#mobile-now-open')?.addEventListener('click', (e) => { if (e.target.closest('.heart-btn') || e.target.closest('a')) return; const panel=$('#mobile-now-playing'); if(panel){panel.classList.add('open');panel.setAttribute('aria-hidden','false');panel.classList.toggle('show-lyrics',Boolean(state.mobileLyricsOpen));panel.classList.toggle('show-queue',Boolean(state.mobileQueueOpen));document.body.classList.add('mobile-player-open');const lp=$('#mobile-now-lyrics'); if(lp) lp.hidden=!state.mobileLyricsOpen; const qp=$('#mobile-now-queue'); if(qp) qp.hidden=!state.mobileQueueOpen;} });
   $('#mobile-now-open')?.addEventListener('keydown', (e) => { if ((e.key==='Enter'||e.key===' ') && !e.target.closest('a')) { e.preventDefault(); $('#mobile-now-open').click(); } });
-  $('#mobile-now-close')?.addEventListener('click', () => { const panel=$('#mobile-now-playing'); if(panel){panel.classList.remove('open');panel.setAttribute('aria-hidden','true');document.body.classList.remove('mobile-player-open');} });
+  $('#mobile-now-close')?.addEventListener('click', () => { const panel=$('#mobile-now-playing'); if(panel){panel.classList.remove('open');panel.setAttribute('aria-hidden','true');panel.classList.remove('show-lyrics','show-queue');document.body.classList.remove('mobile-player-open');} state.mobileLyricsOpen=false; state.mobileQueueOpen=false; const lp=$('#mobile-now-lyrics'); if(lp) lp.hidden=true; const qp=$('#mobile-now-queue'); if(qp) qp.hidden=true; });
   $('#mobile-now-toggle')?.addEventListener('click', () => { if (audio.paused) audio.play().catch((e) => toast(humanErr(e), true)); else audio.pause(); });
   $('#mobile-now-prev')?.addEventListener('click', () => action(() => skip(-1)));
   $('#mobile-now-next')?.addEventListener('click', () => action(() => skip(1)));
-  $('#mobile-now-more')?.addEventListener('click', () => { const panel=$('#mobile-now-playing'); panel?.classList.remove('open'); panel?.setAttribute('aria-hidden','true'); document.body.classList.remove('mobile-player-open'); state.railTab='queue'; toggleRail(false); refreshRail(); });
   const mobileSeek=$('#mobile-now-seek'); if(mobileSeek){mobileSeek.oninput=(e)=>{seeking=true;const v=Number(e.target.value);e.target.style.setProperty('--pct',`${v/10}%`);if($('#mobile-now-elapsed'))$('#mobile-now-elapsed').textContent=nice((dur()*v)/1000)};mobileSeek.onchange=(e)=>{if(dur()>0)audio.currentTime=(dur()*Number(e.target.value))/1000;seeking=false;sync();};}
   $('#sw-prev').onclick = () => action(() => skip(-1));
   $('#sw-next').onclick = () => action(() => skip(1));
