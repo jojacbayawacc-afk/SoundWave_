@@ -400,27 +400,55 @@ function albumTile(a) {
   return `<article class="release-tile card-link" tabindex="0" role="link" data-open-album="${a.album_id}" data-queue="${q}"><span class="release-art">${albumArt({ song_id: a.album_id, album: a }, 'large')}<button type="button" class="hover-play" data-play="${a.songs[0].song_id}" aria-label="Play ${esc(a.title)}">${icon('play')}</button></span><strong>${esc(a.title)}</strong><small>${yearOf(a.release_date) ? yearOf(a.release_date) + ' · ' : ''}${esc(a.artist?.artist_name || 'SoundWave')}</small></article>`;
 }
 function publiclyReleasedArtist(a){return isOwnArtist(a)||songsByArtist(a.artist_id).some(s=>s.is_active!==false && s.album?.is_active!==false);}
-function artistAvatarUrl(a){
-  if (!a) return null;
-  // The user's account avatar is independent of the artist's wide banner.
-  if (state.user && String(a.user_id) === String(state.user.id) && state.profilePhotoUrl) return state.profilePhotoUrl;
-  const profile=state.socialProfiles?.[String(a.user_id)];
-  if (!profile) return null;
-  const path=profile.profile_photo_path || profile.profile_photo_url;
-  if (!path) return null;
-  if (/^https:\/\//i.test(path)) {
-    try { const url=new URL(path); return url.protocol==='https:' && TRUSTED_COVER_HOSTS.has(url.hostname) ? url.href : null; } catch { return null; }
+// Artist avatars belong to the linked users record; covers remain independent.
+// Public images do not need expensive signed-URL requests.
+const artistPhotoRequests = new Map();
+const artistPhotoUrls = new Map();
+function publicProfileImageUrl(profile){
+  if(!profile)return null;
+  const value=String(profile.profile_photo_url||profile.profile_photo_path||'').trim();
+  if(!value)return null;
+  if(/^https:\/\//i.test(value)){
+    try{const url=new URL(value);return url.protocol==='https:'&&TRUSTED_COVER_HOSTS.has(url.hostname)?url.href:null;}catch{return null;}
   }
-  return db.storage.from('profile-images').getPublicUrl(path).data?.publicUrl || null;
+  return db.storage.from('profile-images').getPublicUrl(value).data?.publicUrl||null;
+}
+function artistAvatarUrl(a){
+  if(!a)return null;
+  if(String(a.user_id)===String(state.user?.id))return publicProfileImageUrl(state.profile)||state.profilePhotoUrl||null;
+  return artistPhotoUrls.get(String(a.user_id))||publicProfileImageUrl(state.socialProfiles?.[String(a.user_id)]);
+}
+async function ensureArtistPhoto(a){
+  if(!a?.user_id||artistAvatarUrl(a)||!state.user)return;
+  const uid=String(a.user_id);
+  if(artistPhotoRequests.has(uid))return artistPhotoRequests.get(uid);
+  // Reuse the existing, field-restricted People Search function. Never query private users directly.
+  // Search by artist name, then validate the linked user_id (not artist_id).
+  const request=(async()=>{
+    const q=String(a.artist_name||'').trim();if(q.length<2)return;
+    try{
+      const {data,error}=await db.rpc('soundwave_search_public_people',{p_query:q.slice(0,80),p_limit:30});
+      if(error)return;
+      const profile=(data||[]).find(p=>String(p.user_id)===uid);
+      if(!profile)return;
+      state.socialProfiles[uid]={...(state.socialProfiles[uid]||{}),...profile};
+      const url=publicProfileImageUrl(profile);
+      if(url){artistPhotoUrls.set(uid,url);updateArtistArtwork(a);}
+    }catch(e){console.info('Artist avatar lookup unavailable',e);}
+  })();
+  artistPhotoRequests.set(uid,request);
+  return request;
 }
 function artistCircleArtwork(a){
  const url=artistAvatarUrl(a);
- return url ? `<img class="artist-avatar-photo" src="${esc(url)}" alt="" loading="lazy" decoding="async">` : esc(a?.artist_name?.[0]||'A');
+ if(!url)void ensureArtistPhoto(a);
+ return url?`<img class="artist-avatar-photo" data-artist-photo="${Number(a.artist_id)}" src="${esc(url)}" alt="" decoding="async">`:`<span data-artist-initial="${Number(a.artist_id)}">${esc(a?.artist_name?.[0]||'A')}</span>`;
 }
-function artistArtwork(a, initialClass='artist-search-photo') {
+function artistArtwork(a,initialClass='artist-search-photo'){
  const id=Number(a?.artist_id)||0;
  const url=artistAvatarUrl(a);
- return url ? `<img class="${initialClass}" data-artist-photo="${id}" src="${esc(url)}" alt="" loading="lazy" decoding="async">` : `<span class="artist-initial" data-artist-initial="${id}">${esc(a?.artist_name?.[0]||'A')}</span>`;
+ if(!url)void ensureArtistPhoto(a);
+ return url?`<img class="${initialClass}" data-artist-photo="${id}" src="${esc(url)}" alt="" loading="lazy" decoding="async">`:`<span class="artist-initial" data-artist-initial="${id}">${esc(a?.artist_name?.[0]||'A')}</span>`;
 }
 function updateArtistArtwork(a){
  if(!a)return;
@@ -428,9 +456,9 @@ function updateArtistArtwork(a){
  if(!url)return;
  document.querySelectorAll(`[data-artist-photo-host="${id}"]`).forEach(host=>{
    let img=host.querySelector('img[data-artist-photo]');
-   if(!img){img=document.createElement('img');img.className='artist-search-photo';img.dataset.artistPhoto=String(id);img.alt='';img.loading='lazy';img.decoding='async';host.prepend(img);}
+   if(!img){img=document.createElement('img');img.className=host.classList.contains('library-artist-photo')?'artist-avatar-photo':'artist-search-photo';img.dataset.artistPhoto=String(id);img.alt='';img.loading='lazy';img.decoding='async';host.prepend(img);}
    if(img.src!==url)img.src=url;
-   host.querySelector('[data-artist-initial]')?.remove();
+   host.querySelectorAll('[data-artist-initial]').forEach(el=>el.remove());
  });
 }
 async function hydrateArtistCovers(artists=state.artists){
@@ -1814,7 +1842,7 @@ function artistDetail() {
   const banner=artist.cover_path&&state.coverUrls[artist.cover_path];
   const bannerStyle=banner?`--artist-cover:url("${esc(banner)}");`:'';
   state.tint = tintFor(artist.artist_id);
-  shell(`<div class="artist-sticky-bar" id="artist-sticky-bar" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-sticky-avatar" style="background:${grad(artist.artist_id)}">${artistCircleArtwork(artist)}</span><strong>${esc(artist.artist_name)}</strong>${releases.length ? `<button type="button" class="artist-sticky-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button>` : ''}</div><section class="artist-profile-hero" id="artist-profile-hero" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-profile-avatar" style="background:${grad(artist.artist_id)}">${artistCircleArtwork(artist)}</span><div><span class="coll-kind">Artist</span><h1 class="coll-title">${esc(artist.artist_name)}</h1><p class="coll-sub">${fc ? `<strong data-follower-count="${artist.artist_id}">${fc}</strong> · ` : ''}${albums.length} ${albums.length === 1 ? 'release' : 'releases'} · ${releases.length} ${releases.length === 1 ? 'song' : 'songs'}${artist.country ? ' · ' + esc(artist.country) : ''}</p></div></section>
+  shell(`<div class="artist-sticky-bar" id="artist-sticky-bar" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-sticky-avatar" data-artist-photo-host="${artist.artist_id}" style="background:${grad(artist.artist_id)}">${artistCircleArtwork(artist)}</span><strong>${esc(artist.artist_name)}</strong>${releases.length ? `<button type="button" class="artist-sticky-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button>` : ''}</div><section class="artist-profile-hero" id="artist-profile-hero" style="--artist-accent:${tintFor(artist.artist_id)};${bannerStyle}"><span class="artist-profile-avatar" data-artist-photo-host="${artist.artist_id}" style="background:${grad(artist.artist_id)}">${artistCircleArtwork(artist)}</span><div><span class="coll-kind">Artist</span><h1 class="coll-title">${esc(artist.artist_name)}</h1><p class="coll-sub">${fc ? `<strong data-follower-count="${artist.artist_id}">${fc}</strong> · ` : ''}${albums.length} ${albums.length === 1 ? 'release' : 'releases'} · ${releases.length} ${releases.length === 1 ? 'song' : 'songs'}${artist.country ? ' · ' + esc(artist.country) : ''}</p></div></section>
 <div class="coll-actions artist-primary-actions">${releases.length ? `<button type="button" class="sw-big-play" data-play-ids="${ids(releases).join(',')}" aria-label="Play ${esc(artist.artist_name)}">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle">${icon('shuffle')}</button>` : ''}${own ? `<button type="button" class="follow-btn" data-nav="followers">View your followers</button>` : followBtn(artist)}</div>
 ${releases.length ? `<section class="artist-section"><div class="section-heading"><div><h2>Popular</h2><span class="muted small">Ranked by qualified stream count</span></div></div>${trackTable(releases.slice(0, 10), { queue: ids(releases), showAlbum: false, extraLabel: 'Streams', extraClass: 'streams', extraCell: (song)=>popularityLoaded ? Number(popularity[song.song_id]||0).toLocaleString() : '…' })}</section>` : ''}
 ${albums.length ? `<section class="shelf-section artist-section"><div class="section-heading"><h2>Discography</h2></div><div class="shelf">${albums.map(albumTile).join('')}</div></section>` : '<div class="empty">No published releases yet.</div>'}
