@@ -1796,7 +1796,8 @@ async function loadData(){if(!state.user)return;const id=state.user.id;const req
  if(state.admin){const ar=await db.rpc('admin_list_admin_user_ids');if(!ar.error)state.adminUserIds=(Array.isArray(ar.data)?ar.data:[]).map(x=>String(x.user_id??x));else console.info('Admin list helper unavailable:',ar.error.message);}
  state.subscriptionRequests=reqs.error?[]:(reqs.data||[]);
  if(!lib.error&&Array.isArray(lib.data)) state.playlists=lib.data;
- if(!social2.error&&social2.data){const so=Array.isArray(social2.data)?social2.data[0]:social2.data;state.followers=so?.followers||state.followers;state.following=so?.following||state.following;}
+ // The legacy social_connections RPC may report stale/mixed artist counts.
+ // user_follow above remains authoritative for both incoming/outgoing relationships.
  if(!af2.error&&Array.isArray(af2.data)){state.artistFollowers=af2.data.map(x=>({follower_user_id:x.user_id,display_name:x.display_name,profile_photo_path:x.profile_photo_path||x.profile_photo_url||null}));state.socialRpc.mine=true;}
  if(state.profile?.profile_photo_path){const pr=db.storage.from('profile-images').getPublicUrl(state.profile.profile_photo_path);state.profilePhotoUrl=pr.data?.publicUrl||null;}else state.profilePhotoUrl=null;
  const extraCoverPaths=[...new Set([...state.playlists.map(x=>x.cover_path),...state.podcasts.map(x=>x.cover_path),...state.myShows.map(x=>x.cover_path),...state.artists.map(x=>x.cover_path),state.artist?.cover_path].filter(x=>x&&!state.coverUrls[x]))].slice(0,220);
@@ -2402,20 +2403,11 @@ function bindFavoriteButtons(){ /* Follow buttons are handled globally (see the 
 const personName = (uid) => state.socialProfiles?.[String(uid)]?.display_name || `Listener ${String(uid || '').slice(0, 6)}`;
 const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return ''; } };
 function followerRows() {
-  // Unified follow identity: show incoming user_follow records for both listeners and artists.
-  // Artist-specific RPC rows are merged only as a backwards-compatible fallback.
-  const merged=new Map();
-  for(const r of (state.followers||[])){
-    const id=String(r.follower_user_id||'');if(!id||id===String(state.user?.id))continue;
-    const p=state.ownFollowerNames?.[id]||state.socialProfiles?.[id]||{};
-    merged.set(id,{id,name:p.display_name||p.username||personName(id),since:r.date_followed,photo:p.profile_photo_path||p.profile_photo_url||null});
-  }
-  for(const r of (state.artistFollowers||[])){
-    const id=String(r.follower_user_id||'');if(!id||id===String(state.user?.id))continue;
-    const p=state.ownFollowerNames?.[id]||state.socialProfiles?.[id]||{};
-    merged.set(id,{id,name:p.display_name||p.username||r.display_name||personName(id),since:r.followed_at,photo:p.profile_photo_path||p.profile_photo_url||r.profile_photo_path||r.profile_photo_url||null});
-  }
-  return [...merged.values()];
+ return uniqueFollowIds('followers').map(id=>{
+   const r=(state.followers||[]).find(x=>String(x.follower_user_id)===id)||{};
+   const p=state.ownFollowerNames?.[id]||state.socialProfiles?.[id]||{};
+   return {id,name:p.display_name||p.username||personName(id),since:r.date_followed,photo:p.profile_photo_path||p.profile_photo_url||null};
+ });
 }
 async function hydrateOwnFollowerNames(){
  if(state.ownFollowerNamesLoaded||state.ownFollowerNamesPending||!state.user)return;
@@ -2432,7 +2424,12 @@ async function hydrateOwnFollowerNames(){
    if(['followers','liked-artists'].includes(state.page))render();
  }finally{state.ownFollowerNamesPending=false;}
 }
-function myFollowerCount() { return Math.max(followerRows().length, state.artist ? (state.followerCounts?.[Number(state.artist.artist_id)] || 0) : 0); }
+function uniqueFollowIds(direction){
+ const key=direction==='followers'?'follower_user_id':'followed_user_id';
+ return [...new Set((state[direction]||[]).map(r=>String(r[key]||'')).filter(id=>id&&id!==String(state.user?.id)))];
+}
+function myFollowerCount() { return uniqueFollowIds('followers').length; }
+function myFollowingCount() { return uniqueFollowIds('following').length; }
 const followingArtists = () => state.artists.filter((a) => isFollowing(a.artist_id) && !isOwnArtist(a));
 const followNav = () => (hasArtistAccess() ? 'followers' : 'liked-artists');
 const followLabel = () => (hasArtistAccess() ? 'Followers' : 'Following');
@@ -2490,21 +2487,29 @@ function followers(){
  const isArtist=hasArtistAccess();
  const tab=state.page==='followers'?'followers':'following';
  if(!state.ownFollowerNamesLoaded)void hydrateOwnFollowerNames();
- const fans=followerRows(),fArtists=followingArtists();
- const initial=(n,i=0)=>`<span class="member-avatar" style="background:${grad(i)}">${esc((n||'?')[0].toUpperCase())}</span>`;
- const followersList=fans.length?fans.map((r,i)=>`<div class="social-row"><button type="button" class="social-link sw-follower-link" data-open-follower="${esc(String(r.id||''))}" data-follower-name="${esc(r.name||'')}" aria-label="View ${esc(r.name)} profile">${followerAvatar(r,i)}<span><strong>${esc(r.name)}</strong><small>${r.since?`Followed you ${esc(fmtDate(r.since))}`:'Follows you'}</small></span></button></div>`).join(''):`<div class="empty">No followers yet. When a listener taps <b>Follow</b> on your artist page, they will show up here.</div>`;
- const followingList=fArtists.length?fArtists.map((a,i)=>`<div class="social-row"><button type="button" class="social-link" data-open-artist="${a.artist_id}"><span class="member-avatar sw-social-avatar" data-artist-photo-host="${Number(a.artist_id)}" style="background:${grad(i)}">${artistArtwork(a,'sw-social-avatar-photo')}</span><span><strong>${esc(a.artist_name)}</strong><small>Artist${followerText(a.artist_id)?' · '+followerText(a.artist_id):''}</small></span></button>${followBtn(a,'sm')}</div>`).join(''):`<div class="empty">You are not following any artists yet. <button type="button" class="text-link" data-nav="artists">Find artists to follow</button></div>`;
- const needsSql=isArtist&&tab==='followers'&&!state.socialRpc?.mine;
+ const fans=followerRows();
+ const followingIds=uniqueFollowIds('following');
+ const byOwner=new Map((state.artists||[]).filter(a=>a.user_id).map(a=>[String(a.user_id),a]));
+ // Derive both lists and counts from user_follow. Artist data is presentation only.
+ const followersList=fans.length?fans.map((r,i)=>`<div class="social-row"><button type="button" class="social-link sw-follower-link" data-open-follower="${esc(String(r.id||''))}" data-follower-name="${esc(r.name||'')}" aria-label="View ${esc(r.name)} profile">${followerAvatar(r,i)}<span><strong>${esc(r.name)}</strong><small>${r.since?`Followed you ${esc(fmtDate(r.since))}`:'Follows you'}</small></span></button></div>`).join(''):`<div class="empty">No followers yet.</div>`;
+ const followingList=followingIds.length?followingIds.map((uid,i)=>{
+   const a=byOwner.get(uid);
+   if(a)return `<div class="social-row"><button type="button" class="social-link" data-open-artist="${a.artist_id}"><span class="member-avatar sw-social-avatar" data-artist-photo-host="${Number(a.artist_id)}" style="background:${grad(i)}">${artistArtwork(a,'sw-social-avatar-photo')}</span><span><strong>${esc(a.artist_name)}</strong><small>Artist${followerText(a.artist_id)?' · '+followerText(a.artist_id):''}</small></span></button>${followBtn(a,'sm')}</div>`;
+   const p=state.socialProfiles?.[uid]||{};
+   const name=p.display_name||p.username||`Listener ${uid.slice(0,6)}`;
+   return `<div class="social-row"><button type="button" class="social-link sw-follower-link" data-open-follower="${esc(uid)}" data-follower-name="${esc(name)}" aria-label="View ${esc(name)} profile">${followerAvatar({id:uid,name,photo:p.profile_photo_path||p.profile_photo_url},i)}<span><strong>${esc(name)}</strong><small>Listener</small></span></button></div>`;
+ }).join(''):`<div class="empty">You are not following anyone yet. <button type="button" class="text-link" data-nav="artists">Discover artists</button></div>`;
  const chips=`<div class="home-chips"><button class="${tab==='followers'?'active':''}" data-nav="followers">Followers</button><button class="${tab==='following'?'active':''}" data-nav="liked-artists">Following</button><button data-nav="artists">Discover artists</button></div>`;
- const stats=`<div class="social-stats"><div><strong>${fans.length}</strong><span>Followers</span></div><div><strong>${fArtists.length}</strong><span>Following artists</span></div></div>`;
+ const stats=`<div class="social-stats"><div><strong>${myFollowerCount()}</strong><span>Followers</span></div><div><strong>${myFollowingCount()}</strong><span>Following</span></div></div>`;
+ const needsSql=false;
  shell(`${chips}${stats}${needsSql?`<div class="notice">To see who follows your artist profile, run <code>sql/RUN_ME_likes_and_followers.sql</code> once in the Supabase SQL Editor, then refresh this page.</div>`:''}<section class="social-list">${tab==='followers'?followersList:followingList}</section>`,tab==='followers'?'Followers':'Following','Your SoundWave social connections.');
 }
 
 function profile(){
  const display=state.profile?.display_name||state.user?.email?.split('@')[0]||'SoundWave user';
  const st=state.profileStats||{};
- const followerCount=Number(st.follower_count ?? (hasArtistAccess()?followerRows().length:state.followers.length) ?? 0);
- const followingCount=Number(st.following_count ?? followingArtists().length ?? 0);
+ const followerCount=myFollowerCount();
+ const followingCount=myFollowingCount();
  const playlistCount=Number(st.playlist_count ?? state.playlists.length ?? 0);
  const role=hasAdminAccess()?(hasArtistAccess()?'Artist + Admin':'Admin'):hasArtistAccess()?'Artist':'Listener';
  const premiumName=state.entitlement?.plan_name||'Premium';
