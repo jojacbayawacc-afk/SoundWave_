@@ -2539,7 +2539,7 @@ ${rows.length ? trackTable(rows, { queue: queueIds, remove: true, extraLabel: 'D
   const plName=$('#editplname'),plDesc=$('#editpldesc');
   plName?.addEventListener('input',()=>{const el=$('#playlist-name-count');if(el)el.textContent=`${plName.value.length} / 100`;});
   plDesc?.addEventListener('input',()=>{const el=$('#playlist-desc-count');if(el)el.textContent=`${plDesc.value.length} / 300`;});
-  $('#editplaylist')?.addEventListener('submit', (e) => { e.preventDefault(); action(async () => { const playlistName=val('editplname'),nameProblem=plainNameProblem(playlistName,'Playlist name',100);if(nameProblem)throw Error(nameProblem);const visibility = val('editplvis'); if (visibility === 'Public' && !state.playlistSongs.length) throw Error('BR-017: Add at least one song before making this playlist public.'); let cover_path=chosen.cover_path||null;const cf=$('#editplcover')?.files?.[0];if(cf){if(!['image/jpeg','image/png','image/webp'].includes(cf.type))throw Error('Choose a JPEG, PNG or WebP cover.');if(cf.size>5*1048576)throw Error('Playlist artwork must be under 5 MB.');const ext=(cf.name.split('.').pop()||'jpg').toLowerCase();cover_path=`${state.user.id}/playlists/${state.selectedPlaylist}/cover.${ext}`;check(await db.storage.from('covers').upload(cover_path,cf,{upsert:true,contentType:cf.type}));}const updatePayload={p_playlist_id:Number(state.selectedPlaylist),p_name:playlistName,p_description:val('editpldesc')||null,p_visibility:visibility,p_cover_path:cover_path};const rpcUpdate=await db.rpc('update_my_playlist_details',updatePayload);if(rpcUpdate.error){check(await db.from('playlist').update({ playlist_name:updatePayload.p_name, description:updatePayload.p_description, visibility:updatePayload.p_visibility, cover_path:updatePayload.p_cover_path }).eq('playlist_id', state.selectedPlaylist).eq('user_id', state.user.id));}await loadData();await playlistDetail();toast('Playlist updated'); }); });
+  $('#editplaylist')?.addEventListener('submit', (e) => { e.preventDefault(); action(async () => { const playlistName=val('editplname'),nameProblem=plainNameProblem(playlistName,'Playlist name',100);if(nameProblem)throw Error(nameProblem);const visibility = val('editplvis'); if (visibility === 'Public') { const songCheck=await db.from('playlist_song').select('song_id',{count:'exact',head:true}).eq('playlist_id',Number(state.selectedPlaylist));if(songCheck.error)throw Error('Could not verify playlist songs: '+humanErr(songCheck.error));if((songCheck.count||0)<1)throw Error('BR-017: Add at least one song before making this playlist public.'); } let cover_path=chosen.cover_path||null;const cf=$('#editplcover')?.files?.[0];if(cf){if(!['image/jpeg','image/png','image/webp'].includes(cf.type))throw Error('Choose a JPEG, PNG or WebP cover.');if(cf.size>5*1048576)throw Error('Playlist artwork must be under 5 MB.');const ext=(cf.name.split('.').pop()||'jpg').toLowerCase();cover_path=`${state.user.id}/playlists/${state.selectedPlaylist}/cover.${ext}`;check(await db.storage.from('covers').upload(cover_path,cf,{upsert:true,contentType:cf.type}));}const updatePayload={p_playlist_id:Number(state.selectedPlaylist),p_name:playlistName,p_description:val('editpldesc')||null,p_visibility:visibility,p_cover_path:cover_path};const rpcUpdate=await db.rpc('update_my_playlist_details',updatePayload);if(rpcUpdate.error){const missing=rpcUpdate.error.code==='PGRST202'||Number(rpcUpdate.error.status)===404||/function.*(not found|schema cache)|404/i.test(rpcUpdate.error.message||'');if(!missing)throw rpcUpdate.error;check(await db.from('playlist').update({ playlist_name:updatePayload.p_name, description:updatePayload.p_description, visibility:updatePayload.p_visibility, cover_path:updatePayload.p_cover_path }).eq('playlist_id', state.selectedPlaylist).eq('user_id', state.user.id));}await loadData();await playlistDetail();toast('Playlist updated'); }); });
   $('#create-collab-link')?.addEventListener('click',()=>action(async()=>{const data=check(await db.rpc('create_playlist_invite',{p_playlist_id:state.selectedPlaylist}));const token=Array.isArray(data)?data[0]?.token:data?.token||data; if(!token)throw Error('Could not create invite link.');const url=`${location.origin}${location.pathname}?playlist_invite=${encodeURIComponent(token)}#/discover`;await navigator.clipboard.writeText(url);toast('Collaborator invite link copied');}));
   document.querySelectorAll('[data-collab-remove]').forEach((b) => b.onclick = () => action(async () => { check(await db.from('playlist_collaborator').delete().eq('playlist_id', state.selectedPlaylist).eq('user_id', b.dataset.collabRemove)); await playlistDetail(); toast('Collaborator removed'); }));
   $('#sw-more-menu')?.addEventListener('click', (e) => { e.stopPropagation(); const m = $('#sw-more-options'); m.hidden = !m.hidden; });
@@ -2619,7 +2619,28 @@ function podcasts(){
  }else{
    shell(`<div class="hero hero-podcast"><div><span class="eyebrow">STORIES WORTH HEARING</span><h2>Podcasts for every mood.</h2><p>Discover active shows and listen to the latest episodes.</p><button class="button secondary" data-nav="podcast-studio">${icon('upload')} Podcast Studio</button></div><div class="hero-art">${icon('mic')}</div></div><div class="section-heading"><h2>Explore shows</h2><button class="text-link" data-nav="podcast-studio">Manage your podcasts</button></div><div class="cover-grid podcast-show-grid">${state.podcasts.map((p,i)=>showCard(p,i)).join('')||'<div class="empty">No active shows published yet.</div>'}</div>`,'Podcasts','Discover shows. Publishing and management live in Podcast Studio.');
  }
- document.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>action(async()=>{await requirePlaybackAccess();const ep=state.episodes.find(x=>String(x.episode_id)===b.dataset.episode);if(!ep?.audio_path)throw Error('Episode has no uploaded audio.');const u=check(await db.storage.from('podcast-audio').createSignedUrl(ep.audio_path,3600));startPlayer({kind:'podcast',id:ep.episode_id,title:ep.episode_title,artist:chosen?.show_title||'SoundWave podcasts',url:u.signedUrl,duration:ep.duration_seconds,resumeAt:Number(state.podcastHistory.find(h=>String(h.episode_id)===String(ep.episode_id)&&Number(h.resume_position_seconds)>5)?.resume_position_seconds)||0});}));
+ document.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>action(async()=>{
+  const episodeId=Number(b.dataset.episode);
+  if(!episodeId)return;
+  if(b.dataset.pendingEpisode==='1')return;
+  b.dataset.pendingEpisode='1';
+  try{
+    await requirePlaybackAccess();
+    let ep=state.episodes.find(x=>Number(x.episode_id)===episodeId && Number(x.show_id)===Number(state.selectedShow));
+    // Podcast Studio can change the shared episode list while an opened show remains onscreen.
+    // Read this episode by its stable ID instead of reporting that its audio is missing.
+    if(!ep?.audio_path){
+      const lookup=await db.from('podcast_episode').select('episode_id,show_id,episode_title,duration_seconds,audio_path,is_active').eq('episode_id',episodeId).eq('show_id',state.selectedShow).maybeSingle();
+      if(lookup.error)throw lookup.error;
+      ep=lookup.data;
+    }
+    if(!ep)throw Error('This episode is no longer available.');
+    if(ep.is_active===false)throw Error('This episode is not currently available.');
+    if(!ep.audio_path)throw Error('This episode has no playable audio file attached.');
+    const u=check(await db.storage.from('podcast-audio').createSignedUrl(ep.audio_path,3600));
+    startPlayer({kind:'podcast',id:ep.episode_id,title:ep.episode_title,artist:chosen?.show_title||'SoundWave podcasts',url:u.signedUrl,duration:ep.duration_seconds,resumeAt:Number(state.podcastHistory.find(h=>Number(h.episode_id)===episodeId&&Number(h.resume_position_seconds)>5)?.resume_position_seconds)||0});
+  } finally{delete b.dataset.pendingEpisode;}
+}));
 }
 
 function podcastStudioAnalytics(){
@@ -3373,7 +3394,8 @@ if(hasAdminAccess()){const initialAdminRows=await fetchAdminServerStreams(ANALYT
 await refreshPodcastRecommendationSignals();state.competitionLoaded=true;}
 function showOnboarding(){
  const roleKey=hasAdminAccess()?(hasArtistAccess()?'artist-admin':'admin'):hasArtistAccess()?'artist':'listener';
- const key=`soundwave-onboarded-${roleKey}-${state.user?.id}`;if(!state.user||localStorage.getItem(key))return;
+ const key=`soundwave-onboarded-unified-${state.user?.id}`;if(!state.user||localStorage.getItem(key)||document.querySelector('.onboarding'))return;
+ if(['listener','artist','admin','artist-admin'].some(r=>localStorage.getItem(`soundwave-onboarded-${r}-${state.user.id}`))){localStorage.setItem(key,'1');return;}
  const tours={
   listener:[['Welcome to Discover','Discover brings albums, recommendations, new releases, artists and podcasts into one focused page.','♫'],['Search and save','Find music fast, like songs, follow artists and build playlists.','♥'],['Keep the music moving','Use the player, queue and podcast resume tools across desktop and mobile.','▶']],
   artist:[['Welcome to Artist Studio','Your sidebar has one clear Studio entry for releases and performance.','✦'],['Publish with confidence','Create albums and songs using your existing SoundWave catalog workflow.','♫'],['Read your audience','Track streams, top listeners and royalty estimates without leaving Studio.','↗']],
