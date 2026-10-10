@@ -1670,7 +1670,7 @@ async function loadData(){if(!state.user)return;const id=state.user.id;const req
   if(!m.error)state.subscriptionMembers=m.data||[];else console.warn('Subscription members unavailable',m.error);
   if(!p.error)state.paymentRows=p.data||[];else console.warn('Payment history unavailable',p.error);
  }
- state.followers=[];state.following=[];
+ state.followers=[];state.following=[];state.ownFollowerNamesLoaded=false;state.ownFollowerNames={};
  // RLS already limits social rows to relationships involving the signed-in user.
  // Select * so the frontend tolerates the two column-name variants that existed
  // across the SoundWave documentation and deployed schema.
@@ -2402,8 +2402,35 @@ function bindFavoriteButtons(){ /* Follow buttons are handled globally (see the 
 const personName = (uid) => state.socialProfiles?.[String(uid)]?.display_name || `Listener ${String(uid || '').slice(0, 6)}`;
 const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return ''; } };
 function followerRows() {
-  // People who tapped Follow on this account's artist profile (listeners cannot be followed).
-  return (state.artistFollowers || []).map((r) => ({ id: r.follower_user_id, name: r.display_name || personName(r.follower_user_id), since: r.followed_at, photo: r.profile_photo_path || r.profile_photo_url || null }));
+  // Unified follow identity: show incoming user_follow records for both listeners and artists.
+  // Artist-specific RPC rows are merged only as a backwards-compatible fallback.
+  const merged=new Map();
+  for(const r of (state.followers||[])){
+    const id=String(r.follower_user_id||'');if(!id||id===String(state.user?.id))continue;
+    const p=state.ownFollowerNames?.[id]||state.socialProfiles?.[id]||{};
+    merged.set(id,{id,name:p.display_name||p.username||personName(id),since:r.date_followed,photo:p.profile_photo_path||p.profile_photo_url||null});
+  }
+  for(const r of (state.artistFollowers||[])){
+    const id=String(r.follower_user_id||'');if(!id||id===String(state.user?.id))continue;
+    const p=state.ownFollowerNames?.[id]||state.socialProfiles?.[id]||{};
+    merged.set(id,{id,name:p.display_name||p.username||r.display_name||personName(id),since:r.followed_at,photo:p.profile_photo_path||p.profile_photo_url||r.profile_photo_path||r.profile_photo_url||null});
+  }
+  return [...merged.values()];
+}
+async function hydrateOwnFollowerNames(){
+ if(state.ownFollowerNamesLoaded||state.ownFollowerNamesPending||!state.user)return;
+ state.ownFollowerNamesPending=true;
+ try{
+   const {data,error}=await db.rpc('soundwave_my_follower_labels');
+   if(error){console.warn('Follower directory unavailable; run the included SQL migration',error.message);return;}
+   state.ownFollowerNames={};
+   for(const p of (data||[])){
+     state.ownFollowerNames[String(p.user_id)]=p;
+     state.socialProfiles={...(state.socialProfiles||{}),[String(p.user_id)]:{...(state.socialProfiles?.[String(p.user_id)]||{}),...p}};
+   }
+   state.ownFollowerNamesLoaded=true;
+   if(['followers','liked-artists'].includes(state.page))render();
+ }finally{state.ownFollowerNamesPending=false;}
 }
 function myFollowerCount() { return Math.max(followerRows().length, state.artist ? (state.followerCounts?.[Number(state.artist.artist_id)] || 0) : 0); }
 const followingArtists = () => state.artists.filter((a) => isFollowing(a.artist_id) && !isOwnArtist(a));
@@ -2461,14 +2488,15 @@ async function openFollowerPublicProfile(userId, displayName='') {
 }
 function followers(){
  const isArtist=hasArtistAccess();
- const tab=!isArtist||state.page==='liked-artists'?'following':'followers';
+ const tab=state.page==='followers'?'followers':'following';
+ if(!state.ownFollowerNamesLoaded)void hydrateOwnFollowerNames();
  const fans=followerRows(),fArtists=followingArtists();
  const initial=(n,i=0)=>`<span class="member-avatar" style="background:${grad(i)}">${esc((n||'?')[0].toUpperCase())}</span>`;
  const followersList=fans.length?fans.map((r,i)=>`<div class="social-row"><button type="button" class="social-link sw-follower-link" data-open-follower="${esc(String(r.id||''))}" data-follower-name="${esc(r.name||'')}" aria-label="View ${esc(r.name)} profile">${followerAvatar(r,i)}<span><strong>${esc(r.name)}</strong><small>${r.since?`Followed you ${esc(fmtDate(r.since))}`:'Follows you'}</small></span></button></div>`).join(''):`<div class="empty">No followers yet. When a listener taps <b>Follow</b> on your artist page, they will show up here.</div>`;
  const followingList=fArtists.length?fArtists.map((a,i)=>`<div class="social-row"><button type="button" class="social-link" data-open-artist="${a.artist_id}"><span class="member-avatar sw-social-avatar" data-artist-photo-host="${Number(a.artist_id)}" style="background:${grad(i)}">${artistArtwork(a,'sw-social-avatar-photo')}</span><span><strong>${esc(a.artist_name)}</strong><small>Artist${followerText(a.artist_id)?' · '+followerText(a.artist_id):''}</small></span></button>${followBtn(a,'sm')}</div>`).join(''):`<div class="empty">You are not following any artists yet. <button type="button" class="text-link" data-nav="artists">Find artists to follow</button></div>`;
  const needsSql=isArtist&&tab==='followers'&&!state.socialRpc?.mine;
- const chips=isArtist?`<div class="home-chips"><button class="${tab==='followers'?'active':''}" data-nav="followers">Followers</button><button class="${tab==='following'?'active':''}" data-nav="liked-artists">Following</button></div>`:`<div class="home-chips"><button data-nav="artists">Discover</button><button class="active" data-nav="liked-artists">Following</button></div>`;
- const stats=isArtist?`<div class="social-stats"><div><strong>${fans.length}</strong><span>Followers</span></div><div><strong>${fArtists.length}</strong><span>Following</span></div></div>`:`<div class="social-stats"><div><strong>${fArtists.length}</strong><span>Following</span></div></div>`;
+ const chips=`<div class="home-chips"><button class="${tab==='followers'?'active':''}" data-nav="followers">Followers</button><button class="${tab==='following'?'active':''}" data-nav="liked-artists">Following</button><button data-nav="artists">Discover artists</button></div>`;
+ const stats=`<div class="social-stats"><div><strong>${fans.length}</strong><span>Followers</span></div><div><strong>${fArtists.length}</strong><span>Following artists</span></div></div>`;
  shell(`${chips}${stats}${needsSql?`<div class="notice">To see who follows your artist profile, run <code>sql/RUN_ME_likes_and_followers.sql</code> once in the Supabase SQL Editor, then refresh this page.</div>`:''}<section class="social-list">${tab==='followers'?followersList:followingList}</section>`,tab==='followers'?'Followers':'Following','Your SoundWave social connections.');
 }
 
@@ -2481,7 +2509,7 @@ function profile(){
  const role=hasAdminAccess()?(hasArtistAccess()?'Artist + Admin':'Admin'):hasArtistAccess()?'Artist':'Listener';
  const premiumName=state.entitlement?.plan_name||'Premium';
  const avatar=state.profilePhotoUrl?`<img src="${esc(state.profilePhotoUrl)}" alt="${esc(display)}">`:esc(display[0]?.toUpperCase()||'S');
- shell(`<section class="profile-card-v26"><div class="profile-identity-row"><button type="button" class="profile-avatar-v26 profile-photo-btn ${isPremiumUser()?'premium-user':''}" id="profile-photo-btn" title="Change profile photo">${avatar}<span class="profile-photo-edit">${icon('upload')}</span></button><div class="profile-identity-copy"><span class="eyebrow">YOUR PROFILE</span><h2>${esc(display)}</h2><div class="profile-badge-row"><span class="role-badge">${esc(role)}</span>${isPremiumUser()?`<span class="mini-premium-chip">${icon('check')} ${esc(premiumName)}</span>`:''}</div></div><button class="button secondary sm profile-edit-v26" id="edit-profile-btn">Edit</button></div><div class="profile-stat-row"><button ${hasArtistAccess()?'data-nav="followers"':'data-nav="liked-artists"'}><strong>${followerCount}</strong><span>Followers</span></button><button data-nav="liked-artists"><strong>${followingCount}</strong><span>Following</span></button><button data-nav="playlists"><strong>${playlistCount}</strong><span>Playlists</span></button>${isPremiumUser()?`<button data-nav="downloads"><strong>${state.offlineDownloads.length}</strong><span>Downloads</span></button>`:''}</div><div class="profile-action-grid-v26">${hasArtistAccess()?`<button data-nav="studio">${icon('upload')}<span><strong>Artist Studio</strong><small>Releases and analytics</small></span></button>`:''}<button data-nav="playlists">${icon('library')}<span><strong>Your Library</strong><small>Playlists and saved music</small></span></button><button data-nav="history">${icon('clock')}<span><strong>Recently played</strong><small>Your listening activity</small></span></button><button data-nav="plans">${icon('check')}<span><strong>${isPremiumUser()?'Manage Premium':'Premium'}</strong><small>${isPremiumUser()?esc(premiumName):'View available plans'}</small></span></button></div></section><div class="profile-danger-zone"><button class="button danger" id="deactivate-account">Deactivate account</button><button class="button secondary profile-signout" id="profile-page-signout">Sign out</button></div><input type="file" accept="image/jpeg,image/png,image/webp" id="profile-photo-file" hidden><dialog class="sw-modal" id="edit-profile-dialog"><div class="modal-head"><div><span class="eyebrow">PROFILE</span><h2>Edit your profile</h2></div><button class="modal-close" data-close-modal>${icon('close')}</button></div><form id="edit-profile-form"><label class="single-field">Display name<input id="profile-display-name" value="${esc(display)}" required maxlength="90"></label><p class="muted small">Profile photos are stored securely in your SoundWave profile.</p><div class="dialog-actions"><button type="button" class="button secondary" data-close-modal>Cancel</button><button class="button">Save</button></div></form></dialog>`,'Profile','Your SoundWave identity, library and account.');
+ shell(`<section class="profile-card-v26"><div class="profile-identity-row"><button type="button" class="profile-avatar-v26 profile-photo-btn ${isPremiumUser()?'premium-user':''}" id="profile-photo-btn" title="Change profile photo">${avatar}<span class="profile-photo-edit">${icon('upload')}</span></button><div class="profile-identity-copy"><span class="eyebrow">YOUR PROFILE</span><h2>${esc(display)}</h2><div class="profile-badge-row"><span class="role-badge">${esc(role)}</span>${isPremiumUser()?`<span class="mini-premium-chip">${icon('check')} ${esc(premiumName)}</span>`:''}</div></div><button class="button secondary sm profile-edit-v26" id="edit-profile-btn">Edit</button></div><div class="profile-stat-row"><button data-nav="followers"><strong>${followerCount}</strong><span>Followers</span></button><button data-nav="liked-artists"><strong>${followingCount}</strong><span>Following</span></button><button data-nav="playlists"><strong>${playlistCount}</strong><span>Playlists</span></button>${isPremiumUser()?`<button data-nav="downloads"><strong>${state.offlineDownloads.length}</strong><span>Downloads</span></button>`:''}</div><div class="profile-action-grid-v26">${hasArtistAccess()?`<button data-nav="studio">${icon('upload')}<span><strong>Artist Studio</strong><small>Releases and analytics</small></span></button>`:''}<button data-nav="playlists">${icon('library')}<span><strong>Your Library</strong><small>Playlists and saved music</small></span></button><button data-nav="history">${icon('clock')}<span><strong>Recently played</strong><small>Your listening activity</small></span></button><button data-nav="plans">${icon('check')}<span><strong>${isPremiumUser()?'Manage Premium':'Premium'}</strong><small>${isPremiumUser()?esc(premiumName):'View available plans'}</small></span></button></div></section><div class="profile-danger-zone"><button class="button danger" id="deactivate-account">Deactivate account</button><button class="button secondary profile-signout" id="profile-page-signout">Sign out</button></div><input type="file" accept="image/jpeg,image/png,image/webp" id="profile-photo-file" hidden><dialog class="sw-modal" id="edit-profile-dialog"><div class="modal-head"><div><span class="eyebrow">PROFILE</span><h2>Edit your profile</h2></div><button class="modal-close" data-close-modal>${icon('close')}</button></div><form id="edit-profile-form"><label class="single-field">Display name<input id="profile-display-name" value="${esc(display)}" required maxlength="90"></label><p class="muted small">Profile photos are stored securely in your SoundWave profile.</p><div class="dialog-actions"><button type="button" class="button secondary" data-close-modal>Cancel</button><button class="button">Save</button></div></form></dialog>`,'Profile','Your SoundWave identity, library and account.');
  $('#edit-profile-btn').onclick=()=>$('#edit-profile-dialog').showModal();
  $('#profile-photo-btn').onclick=()=>$('#profile-photo-file').click();
  $('#profile-photo-file').onchange=e=>action(async()=>{const file=e.target.files?.[0];if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Choose a JPEG, PNG or WebP image.');if(file.size>5*1048576)throw Error('Profile photo must be under 5 MB.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${state.user.id}/avatar.${ext}`;check(await db.storage.from('profile-images').upload(path,file,{upsert:true,contentType:file.type}));check(await db.from('users').update({profile_photo_path:path}).eq('user_id',state.user.id));await loadData();render();toast('Profile photo updated');});
@@ -2504,7 +2532,7 @@ async function playlistDetail(){
  if(chosen){
    const {data:labels,error:labelError}=await db.rpc('soundwave_playlist_member_labels',{p_playlist_id:Number(state.selectedPlaylist)});
    if(!labelError){state.playlistMemberLabels={};(labels||[]).forEach(r=>{state.playlistMemberLabels[String(r.user_id)]=r;});}
-   else {console.info('Playlist member labels unavailable',labelError.message);state.playlistMemberLabels={};}
+   else {console.warn('Playlist member labels unavailable; run 01_MEMBER_FOLLOWER_DIRECTORY.sql',labelError.message);state.playlistMemberLabels={};}
  }
  render();
 }
@@ -2533,13 +2561,13 @@ function playlists() {
   const idx = state.playlists.findIndex((p) => p.playlist_id === chosen.playlist_id);
   const isOwner=String(chosen.user_id)===String(state.user?.id);
   const isCollaborator=!isOwner&&state.playlistCollaborators.some(c=>String(c.user_id)===String(state.user?.id));
-  const ownerProfile=state.playlistMemberLabels?.[String(chosen.user_id)] || state.socialProfiles?.[String(chosen.user_id)] || {};
+  const ownerProfile=state.playlistMemberLabels?.[String(chosen.user_id)] || state.socialProfiles?.[String(chosen.user_id)] || (String(chosen.user_id)===String(state.user?.id)?(state.profile||{}):{});
   const display=isOwner ? (state.profile?.display_name||state.profile?.username||'You') : (ownerProfile.display_name||ownerProfile.username||'Playlist owner');
   const accessLabel=isOwner?'You own this playlist':isCollaborator?'You are a collaborator':'Listening to someone else’s playlist';
   const covers = rows.filter((s) => s.album?.cover_path && state.coverUrls[s.album.cover_path]);
   const collageTile=(song,n)=>{const path=song?.cover_path||song?.album?.cover_path,url=path&&state.coverUrls?.[path];return url?`<span class="cover-collage-tile"><img src="${esc(url)}" alt="" loading="lazy"></span>`:`<span class="cover-collage-tile placeholder-art" style="background:${grad((song?.song_id||0)+n)}">${icon('music')}</span>`;};
   const cover = chosen.cover_path&&state.coverUrls[chosen.cover_path]?`<img class="cover-img playlist-main-cover" src="${esc(state.coverUrls[chosen.cover_path])}" alt="${esc(chosen.playlist_name)}">`:covers.length >= 4 ? `<div class="cover-collage">${covers.slice(0, 4).map((s,n) => collageTile(s,n)).join('')}</div>` : covers.length ? `<img class="cover-img playlist-main-cover" src="${esc(state.coverUrls[covers[0].cover_path||covers[0].album?.cover_path])}" alt="" loading="lazy">` : `<span class="placeholder-art large" style="background:${grad(idx)}">${icon('music')}</span>`;
-  const collab = state.playlistCollaborators.map((c, i) => {const profile=state.playlistMemberLabels?.[String(c.user_id)]||state.socialProfiles?.[String(c.user_id)]||{};const name=profile.display_name||profile.username||c.display_name||'Collaborator';return `<div class="collab-row"><span class="member-avatar">${esc(name[0].toUpperCase())}</span><div><strong>${esc(name)}</strong>${profile.username&&profile.username!==name?`<small>@${esc(profile.username)}</small>`:''}<small>Collaborator${c.date_added ? ` · ${esc(c.date_added)}` : ''}</small></div>${isOwner?`<button type="button" class="icon-quiet" data-collab-remove="${esc(c.user_id)}" aria-label="Remove collaborator">${icon('close')}</button>`:''}</div>`;}).join('');
+  const collab = state.playlistCollaborators.map((c, i) => {const profile=state.playlistMemberLabels?.[String(c.user_id)]||state.socialProfiles?.[String(c.user_id)]||(String(c.user_id)===String(state.user?.id)?state.profile:{} )||{};const name=profile.display_name||profile.username||c.display_name||(String(c.user_id)===String(state.user?.id)?'You':'Collaborator');return `<div class="collab-row"><span class="member-avatar">${esc(name[0].toUpperCase())}</span><div><strong>${esc(name)}</strong>${profile.username&&profile.username!==name?`<small>@${esc(profile.username)}</small>`:''}<small>Collaborator${c.date_added ? ` · ${esc(c.date_added)}` : ''}</small></div>${isOwner?`<button type="button" class="icon-quiet" data-collab-remove="${esc(c.user_id)}" aria-label="Remove collaborator">${icon('close')}</button>`:''}</div>`;}).join('');
   state.tint = tintFor(chosen.playlist_id);
   shell(`<header class="coll-hero"><div class="coll-cover">${cover}</div><div class="coll-meta"><span class="coll-kind">${esc(chosen.visibility)} playlist</span><h1 class="coll-title">${esc(chosen.playlist_name)}</h1>${chosen.description ? `<p class="coll-desc">${esc(chosen.description)}</p>` : ''}<p class="coll-sub"><span class="sw-owner-avatar">${esc(display[0]?.toUpperCase() || 'S')}</span><strong>${esc(display)}</strong> <span class="sw-owner-marker">${isOwner?"Owner (you)":"Owner"}</span> · ${rows.length} ${rows.length === 1 ? 'song' : 'songs'}${rows.length ? ', ' + totalTime(rows) : ''}${state.playlistCollaborators.length ? ` · ${state.playlistCollaborators.length} collaborators` : ''}</p><p class="sw-playlist-access">${esc(accessLabel)}</p><div id="playlist-presence" class="playlist-presence">${playlistPresenceHtml()}</div></div></header>
 <div class="coll-actions"><button type="button" class="sw-big-play" data-play-ids="${queueIds.join(',')}" ${!queueIds.length ? 'disabled' : ''} aria-label="Play playlist">${icon('play')}</button><button type="button" class="sw-quiet-action shuffle-toggle" data-toggle-shuffle aria-label="Shuffle" ${!queueIds.length ? 'disabled' : ''}>${icon('shuffle')}</button><div class="more-wrap"><button type="button" class="sw-more" id="sw-more-menu" aria-label="More options">${icon('dots')}</button><div id="sw-more-options" class="sw-more-options" hidden>${isOwner?`<button type="button" data-open-modal="playlist-edit-dialog">${icon('settings')} Edit playlist</button><button type="button" data-open-modal="playlist-collab-dialog">${icon('users')} Collaborators</button><button type="button" id="deactivate">Delete playlist</button>`:`<button type="button" data-open-modal="playlist-collab-dialog">${icon('users')} View collaborators</button>`}</div></div></div>
