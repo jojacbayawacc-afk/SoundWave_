@@ -5511,3 +5511,62 @@ body[data-page="artist-detail"] .artist-profile-hero{background-image:linear-gra
 .collab-row strong{overflow-wrap:anywhere}
 .collab-row .member-avatar{display:grid;place-items:center;flex:0 0 32px}
 @media(max-width:700px){.coll-sub{display:flex;flex-wrap:wrap;align-items:center;gap:5px}.sw-owner-marker{margin-left:0}.collab-row{min-width:0}.collab-row>div{min-width:0;overflow:hidden}}
+
+/* 2026-10-10: social navigation and playlist membership display */
+.home-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.coll-sub .sw-owner-marker{white-space:nowrap}
+.collab-row{min-width:0;align-items:center;gap:10px}
+.collab-row>div{min-width:0;overflow-wrap:anywhere}
+@media(max-width:700px){.home-chips{gap:6px}.home-chips button{max-width:100%;white-space:nowrap}.social-row .social-link{min-width:0;flex:1}.collab-row strong{overflow-wrap:anywhere}}
+
+/* 2026-10-10: Playlist editor must scroll independently of its action footer.
+   Scoped narrowly to avoid breaking song, podcast and upload dialogs. */
+#playlist-edit-dialog[open] {
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(94vw, 1080px) !important;
+  max-width: calc(100vw - 20px) !important;
+  height: auto !important;
+  max-height: min(90dvh, 850px) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: contain;
+}
+#playlist-edit-dialog > .edit-surface-head {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  top: auto !important;
+  z-index: 2;
+}
+#playlist-edit-dialog > .edit-surface-form {
+  box-sizing: border-box !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #65508c transparent;
+  padding-bottom: 0 !important;
+}
+#playlist-edit-dialog .edit-surface-actions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 3 !important;
+  background: #191328 !important;
+  border-top: 1px solid #4c3a67 !important;
+}
+#playlist-edit-dialog .edit-surface-grid,
+#playlist-edit-dialog .edit-fields,
+#playlist-edit-dialog .visibility-cards { min-width: 0; }
+@media (max-width: 700px), (max-height: 650px) {
+  #playlist-edit-dialog[open] {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+  }
+  #playlist-edit-dialog .edit-surface-actions { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important; }
+}
